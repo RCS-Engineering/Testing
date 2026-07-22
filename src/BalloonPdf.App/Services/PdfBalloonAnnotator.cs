@@ -21,6 +21,8 @@ public sealed class PdfBalloonAnnotator
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPdfPath);
         ArgumentNullException.ThrowIfNull(dimensions);
 
+        ArialFontResolver.Register();
+
         var inputFullPath = Path.GetFullPath(inputPdfPath);
         var outputFullPath = Path.GetFullPath(outputPdfPath);
         if (inputFullPath.Equals(outputFullPath, StringComparison.OrdinalIgnoreCase))
