@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+.coverage/
+.dotnet/
+dotnet-install.sh
