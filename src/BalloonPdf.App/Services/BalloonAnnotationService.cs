@@ -1,0 +1,106 @@
+using BalloonPdf.App.Models;
+
+namespace BalloonPdf.App.Services;
+
+public sealed class BalloonAnnotationService
+{
+    public IReadOnlyList<BalloonAnnotation> CreateFromDimensions(IEnumerable<DimensionCandidate> dimensions)
+    {
+        ArgumentNullException.ThrowIfNull(dimensions);
+
+        return dimensions
+            .OrderBy(dimension => dimension.PageNumber)
+            .ThenBy(dimension => dimension.BalloonNumber)
+            .Select(dimension => BalloonAnnotation.Create(
+                dimension.PageNumber,
+                dimension.Right + PdfBalloonAnnotator.BalloonOffsetX,
+                dimension.CenterY,
+                dimension.BalloonNumber,
+                dimension.Text,
+                BalloonAnnotation.DefaultStrokeColorHex,
+                PdfBalloonAnnotator.BalloonRadius))
+            .ToList();
+    }
+
+    public IReadOnlyList<BalloonAnnotation> Add(
+        IEnumerable<BalloonAnnotation> annotations,
+        int pageNumber,
+        double centerX,
+        double centerY,
+        string? sourceText = null,
+        string? strokeColorHex = null)
+    {
+        var current = RequireAnnotations(annotations);
+        var nextNumber = current.Count == 0 ? 1 : current.Max(annotation => annotation.BalloonNumber) + 1;
+        current.Add(BalloonAnnotation.Create(
+            pageNumber,
+            centerX,
+            centerY,
+            nextNumber,
+            sourceText,
+            NormalizeColor(strokeColorHex ?? BalloonAnnotation.DefaultStrokeColorHex),
+            PdfBalloonAnnotator.BalloonRadius));
+        return GetOrdered(current);
+    }
+
+    public IReadOnlyList<BalloonAnnotation> Delete(IEnumerable<BalloonAnnotation> annotations, Guid annotationId)
+    {
+        return GetOrdered(RequireAnnotations(annotations).Where(annotation => annotation.Id != annotationId));
+    }
+
+    public IReadOnlyList<BalloonAnnotation> UpdateNumber(IEnumerable<BalloonAnnotation> annotations, Guid annotationId, int balloonNumber)
+    {
+        if (balloonNumber <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(balloonNumber), "Balloon numbers must be positive.");
+        }
+
+        return GetOrdered(RequireAnnotations(annotations).Select(annotation =>
+            annotation.Id == annotationId
+                ? annotation with { BalloonNumber = balloonNumber }
+                : annotation));
+    }
+
+    public IReadOnlyList<BalloonAnnotation> UpdateColor(IEnumerable<BalloonAnnotation> annotations, Guid annotationId, string strokeColorHex)
+    {
+        var normalizedColor = NormalizeColor(strokeColorHex);
+        return GetOrdered(RequireAnnotations(annotations).Select(annotation =>
+            annotation.Id == annotationId
+                ? annotation with { StrokeColorHex = normalizedColor }
+                : annotation));
+    }
+
+    public IReadOnlyList<BalloonAnnotation> GetOrdered(IEnumerable<BalloonAnnotation> annotations)
+    {
+        return RequireAnnotations(annotations)
+            .OrderBy(annotation => annotation.PageNumber)
+            .ThenBy(annotation => annotation.BalloonNumber)
+            .ThenBy(annotation => annotation.CenterY)
+            .ThenBy(annotation => annotation.CenterX)
+            .ToList();
+    }
+
+    private static List<BalloonAnnotation> RequireAnnotations(IEnumerable<BalloonAnnotation> annotations)
+    {
+        ArgumentNullException.ThrowIfNull(annotations);
+        return annotations.ToList();
+    }
+
+    private static string NormalizeColor(string strokeColorHex)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(strokeColorHex);
+
+        var color = strokeColorHex.Trim();
+        if (!color.StartsWith('#'))
+        {
+            color = $"#{color}";
+        }
+
+        if (color.Length != 7 || color.Skip(1).Any(character => !Uri.IsHexDigit(character)))
+        {
+            throw new ArgumentException("Balloon colors must use #RRGGBB hex format.", nameof(strokeColorHex));
+        }
+
+        return color.ToUpperInvariant();
+    }
+}

@@ -101,10 +101,13 @@ public sealed class ArialFontResolver : IFontResolver
     {
         foreach (var directory in GetKnownFontDirectories())
         {
-            var path = Path.Combine(directory, fileName);
-            if (File.Exists(path))
+            foreach (var candidateFileName in GetCandidateFileNames(fileName))
             {
-                return File.ReadAllBytes(path);
+                var path = Path.Combine(directory, candidateFileName);
+                if (File.Exists(path))
+                {
+                    return File.ReadAllBytes(path);
+                }
             }
         }
 
@@ -125,6 +128,27 @@ public sealed class ArialFontResolver : IFontResolver
         if (!string.IsNullOrWhiteSpace(fontsDirectory))
         {
             yield return fontsDirectory;
+        }
+
+        yield return "/usr/share/fonts/truetype/msttcorefonts";
+        yield return "/usr/share/fonts/truetype/liberation2";
+        yield return "/usr/share/fonts/truetype/dejavu";
+    }
+
+    private static IEnumerable<string> GetCandidateFileNames(string fileName)
+    {
+        yield return fileName;
+
+        foreach (var fallbackFileName in fileName.ToLowerInvariant() switch
+        {
+            RegularFileName => new[] { "LiberationSans-Regular.ttf", "DejaVuSans.ttf" },
+            BoldFileName => new[] { "LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf" },
+            ItalicFileName => new[] { "LiberationSans-Italic.ttf", "DejaVuSans-Oblique.ttf" },
+            BoldItalicFileName => new[] { "LiberationSans-BoldItalic.ttf", "DejaVuSans-BoldOblique.ttf" },
+            _ => Array.Empty<string>()
+        })
+        {
+            yield return fallbackFileName;
         }
     }
 
