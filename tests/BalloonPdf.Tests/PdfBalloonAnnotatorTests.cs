@@ -80,6 +80,24 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         Assert.Contains("42", text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddBalloons_RasterizesBalloonNumberAsDenseFilledGlyphs()
+    {
+        var inputPath = CreateBlankPdf("input-for-rasterized-number.pdf");
+        var outputPath = Path.Combine(tempDirectory, "output-with-rasterized-number.pdf");
+        var annotations = new[]
+        {
+            BalloonAnnotation.Create(1, centerX: 100, centerY: 100, balloonNumber: 88, strokeColorHex: "#000000")
+        };
+
+        annotator.AddBalloons(inputPath, outputPath, annotations);
+
+        var preview = new PdfPagePreviewRenderer().RenderPage(outputPath, pageNumber: 1, pixelWidth: 400, pixelHeight: 400);
+        var darkPixels = CountDarkPixels(preview, left: 185, top: 188, width: 30, height: 24);
+
+        Assert.True(darkPixels >= 85, $"Expected a dense filled digit footprint, but found only {darkPixels} dark pixels.");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(tempDirectory))
@@ -88,13 +106,37 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         }
     }
 
+    private static int CountDarkPixels(PdfPagePreviewImage preview, int left, int top, int width, int height)
+    {
+        var count = 0;
+        var right = Math.Min(preview.PixelWidth, left + width);
+        var bottom = Math.Min(preview.PixelHeight, top + height);
+        for (var y = Math.Max(0, top); y < bottom; y++)
+        {
+            for (var x = Math.Max(0, left); x < right; x++)
+            {
+                var offset = (y * preview.Stride) + (x * 4);
+                var blue = preview.Pixels[offset];
+                var green = preview.Pixels[offset + 1];
+                var red = preview.Pixels[offset + 2];
+                var alpha = preview.Pixels[offset + 3];
+                if (alpha > 0 && red < 80 && green < 80 && blue < 80)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
     private string CreateBlankPdf(string fileName)
     {
         var path = Path.Combine(tempDirectory, fileName);
         using var document = new PdfDocument();
         var page = document.AddPage();
-        page.Width = 200;
-        page.Height = 200;
+        page.Width = XUnit.FromPoint(200);
+        page.Height = XUnit.FromPoint(200);
         document.Save(path);
         return path;
     }
@@ -106,8 +148,8 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         var path = Path.Combine(tempDirectory, fileName);
         using var document = new PdfDocument();
         var page = document.AddPage();
-        page.Width = 200;
-        page.Height = 200;
+        page.Width = XUnit.FromPoint(200);
+        page.Height = XUnit.FromPoint(200);
         using var graphics = XGraphics.FromPdfPage(page);
         var font = new XFont("Arial", 12, XFontStyleEx.Regular);
         graphics.DrawString(text, font, XBrushes.Black, new XPoint(24, 80));
