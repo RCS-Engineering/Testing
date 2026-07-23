@@ -114,16 +114,22 @@ public sealed class PdfBalloonAnnotator
 
     private static void DrawBalloonNumber(XGraphics graphics, XPen pen, XRect bounds, int balloonNumber)
     {
-        ArialFontResolver.Register();
-
         var text = Math.Max(0, balloonNumber).ToString(CultureInfo.InvariantCulture);
         var scaledFontSize = BalloonFontSize * (bounds.Height / (BalloonRadius * 2d));
         var widthFitFontSize = bounds.Width / Math.Max(1.2d, text.Length * 0.62d);
         var fontSize = Math.Max(1d, Math.Min(scaledFontSize, widthFitFontSize));
-        var font = new XFont(BalloonFontFamily, fontSize, XFontStyleEx.Bold);
+        var font = CreateBalloonNumberFont(fontSize);
         var brush = new XSolidBrush(pen.Color);
 
         graphics.DrawString(text, font, brush, bounds, XStringFormats.Center);
+    }
+
+    private static XFont CreateBalloonNumberFont(double fontSize)
+    {
+        ArialFontResolver.Register();
+
+        var options = new XPdfFontOptions(PdfFontEncoding.Unicode, PdfFontEmbedding.EmbedCompleteFontFile);
+        return new XFont(BalloonFontFamily, fontSize, XFontStyleEx.Bold, options);
     }
 
     private static XColor ParseColor(string strokeColorHex)

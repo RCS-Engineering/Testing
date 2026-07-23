@@ -30,7 +30,8 @@ public sealed class PdfPagePreviewRenderer
             throw new ArgumentOutOfRangeException(nameof(pixelHeight), "Preview pixel height must be positive.");
         }
 
-        using var documentReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(pixelWidth, pixelHeight));
+        var pageDimensions = new PageDimensions(Math.Min(pixelWidth, pixelHeight), Math.Max(pixelWidth, pixelHeight));
+        using var documentReader = DocLib.Instance.GetDocReader(pdfPath, pageDimensions);
         var pageCount = documentReader.GetPageCount();
         if (pageNumber > pageCount)
         {

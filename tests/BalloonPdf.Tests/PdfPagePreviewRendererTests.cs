@@ -23,20 +23,21 @@ public sealed class PdfPagePreviewRendererTests : IDisposable
 
         var preview = renderer.RenderPage(pdfPath, pageNumber: 1, pixelWidth: 120, pixelHeight: 120);
 
-        Assert.Equal(120, preview.PixelWidth);
-        Assert.Equal(120, preview.PixelHeight);
+        AssertPreviewContainsVisibleSourceContent(preview, expectedWidth: 120, expectedHeight: 120);
+    }
+
+    [Fact]
+    public void RenderPage_AcceptsLandscapeRequestAndReturnsVisibleSourceContent()
+    {
+        var pdfPath = CreateLandscapePdfWithBlackRectangle("landscape-preview-source.pdf");
+
+        var preview = renderer.RenderPage(pdfPath, pageNumber: 1, pixelWidth: 200, pixelHeight: 100);
+
         Assert.Equal(preview.PixelWidth * 4, preview.Stride);
         Assert.Equal(PdfPagePreviewPixelFormat.Bgra32, preview.PixelFormat);
         Assert.Equal(preview.Stride * preview.PixelHeight, preview.Pixels.Length);
-        Assert.Contains(Enumerable.Range(0, preview.Pixels.Length / 4), pixelIndex =>
-        {
-            var offset = pixelIndex * 4;
-            var blue = preview.Pixels[offset];
-            var green = preview.Pixels[offset + 1];
-            var red = preview.Pixels[offset + 2];
-            var alpha = preview.Pixels[offset + 3];
-            return alpha > 0 && red < 245 && green < 245 && blue < 245;
-        });
+        Assert.True(preview.PixelWidth > preview.PixelHeight);
+        AssertPreviewContainsVisibleSourceContent(preview, expectedWidth: preview.PixelWidth, expectedHeight: preview.PixelHeight);
     }
 
     [Fact]
@@ -56,15 +57,46 @@ public sealed class PdfPagePreviewRendererTests : IDisposable
         }
     }
 
+    private static void AssertPreviewContainsVisibleSourceContent(PdfPagePreviewImage preview, int expectedWidth, int expectedHeight)
+    {
+        Assert.Equal(expectedWidth, preview.PixelWidth);
+        Assert.Equal(expectedHeight, preview.PixelHeight);
+        Assert.Equal(preview.PixelWidth * 4, preview.Stride);
+        Assert.Equal(PdfPagePreviewPixelFormat.Bgra32, preview.PixelFormat);
+        Assert.Equal(preview.Stride * preview.PixelHeight, preview.Pixels.Length);
+        Assert.Contains(Enumerable.Range(0, preview.Pixels.Length / 4), pixelIndex =>
+        {
+            var offset = pixelIndex * 4;
+            var blue = preview.Pixels[offset];
+            var green = preview.Pixels[offset + 1];
+            var red = preview.Pixels[offset + 2];
+            var alpha = preview.Pixels[offset + 3];
+            return alpha > 0 && red < 245 && green < 245 && blue < 245;
+        });
+    }
+
     private string CreatePdfWithBlackRectangle(string fileName)
     {
         var path = Path.Combine(tempDirectory, fileName);
         using var document = new PdfDocument();
         var page = document.AddPage();
-        page.Width = 120;
-        page.Height = 120;
+        page.Width = XUnit.FromPoint(120);
+        page.Height = XUnit.FromPoint(120);
         using var graphics = XGraphics.FromPdfPage(page);
         graphics.DrawRectangle(XBrushes.Black, 20, 20, 60, 40);
+        document.Save(path);
+        return path;
+    }
+
+    private string CreateLandscapePdfWithBlackRectangle(string fileName)
+    {
+        var path = Path.Combine(tempDirectory, fileName);
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Width = XUnit.FromPoint(200);
+        page.Height = XUnit.FromPoint(100);
+        using var graphics = XGraphics.FromPdfPage(page);
+        graphics.DrawRectangle(XBrushes.Black, 20, 20, 80, 40);
         document.Save(path);
         return path;
     }
