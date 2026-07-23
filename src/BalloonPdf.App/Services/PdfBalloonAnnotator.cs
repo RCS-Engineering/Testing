@@ -16,20 +16,6 @@ public sealed class PdfBalloonAnnotator
     internal const string BalloonFontFamily = "Arial";
     internal const double BalloonFontSize = 9d;
 
-    private static readonly IReadOnlyDictionary<char, int[]> DigitSegments = new Dictionary<char, int[]>
-    {
-        ['0'] = new[] { 0, 1, 2, 3, 4, 5 },
-        ['1'] = new[] { 1, 2 },
-        ['2'] = new[] { 0, 1, 6, 4, 3 },
-        ['3'] = new[] { 0, 1, 6, 2, 3 },
-        ['4'] = new[] { 5, 6, 1, 2 },
-        ['5'] = new[] { 0, 5, 6, 2, 3 },
-        ['6'] = new[] { 0, 5, 6, 4, 2, 3 },
-        ['7'] = new[] { 0, 1, 2 },
-        ['8'] = new[] { 0, 1, 2, 3, 4, 5, 6 },
-        ['9'] = new[] { 0, 1, 2, 3, 5, 6 }
-    };
-
     private readonly BalloonAnnotationService annotationService = new();
 
     public void AddBalloons(string inputPdfPath, string outputPdfPath, IReadOnlyCollection<DimensionCandidate> dimensions)
@@ -128,60 +114,16 @@ public sealed class PdfBalloonAnnotator
 
     private static void DrawBalloonNumber(XGraphics graphics, XPen pen, XRect bounds, int balloonNumber)
     {
+        ArialFontResolver.Register();
+
         var text = Math.Max(0, balloonNumber).ToString(CultureInfo.InvariantCulture);
-        var digitHeight = bounds.Height * 0.62d;
-        var digitWidth = Math.Min(bounds.Width / Math.Max(1.8d, text.Length + 0.35d), digitHeight * 0.48d);
-        var spacing = digitWidth * 0.24d;
-        var totalWidth = (digitWidth * text.Length) + (spacing * Math.Max(0, text.Length - 1));
-        var left = bounds.X + ((bounds.Width - totalWidth) / 2d);
-        var top = bounds.Y + ((bounds.Height - digitHeight) / 2d);
-        var numberPen = new XPen(pen.Color, Math.Max(0.8d, bounds.Height * 0.055d));
+        var scaledFontSize = BalloonFontSize * (bounds.Height / (BalloonRadius * 2d));
+        var widthFitFontSize = bounds.Width / Math.Max(1.2d, text.Length * 0.62d);
+        var fontSize = Math.Max(1d, Math.Min(scaledFontSize, widthFitFontSize));
+        var font = new XFont(BalloonFontFamily, fontSize, XFontStyleEx.Bold);
+        var brush = new XSolidBrush(pen.Color);
 
-        for (var index = 0; index < text.Length; index++)
-        {
-            DrawDigit(graphics, numberPen, text[index], left + (index * (digitWidth + spacing)), top, digitWidth, digitHeight);
-        }
-    }
-
-    private static void DrawDigit(XGraphics graphics, XPen pen, char digit, double x, double y, double width, double height)
-    {
-        if (!DigitSegments.TryGetValue(digit, out var segments))
-        {
-            return;
-        }
-
-        var middleY = y + (height / 2d);
-        var right = x + width;
-        var bottom = y + height;
-        var inset = width * 0.12d;
-
-        foreach (var segment in segments)
-        {
-            switch (segment)
-            {
-                case 0:
-                    graphics.DrawLine(pen, x + inset, y, right - inset, y);
-                    break;
-                case 1:
-                    graphics.DrawLine(pen, right, y + inset, right, middleY - inset);
-                    break;
-                case 2:
-                    graphics.DrawLine(pen, right, middleY + inset, right, bottom - inset);
-                    break;
-                case 3:
-                    graphics.DrawLine(pen, x + inset, bottom, right - inset, bottom);
-                    break;
-                case 4:
-                    graphics.DrawLine(pen, x, middleY + inset, x, bottom - inset);
-                    break;
-                case 5:
-                    graphics.DrawLine(pen, x, y + inset, x, middleY - inset);
-                    break;
-                case 6:
-                    graphics.DrawLine(pen, x + inset, middleY, right - inset, middleY);
-                    break;
-            }
-        }
+        graphics.DrawString(text, font, brush, bounds, XStringFormats.Center);
     }
 
     private static XColor ParseColor(string strokeColorHex)

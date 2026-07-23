@@ -3,8 +3,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using BalloonPdf.App.Models;
+using BalloonPdf.App.Services;
 using PdfSharp.Pdf.IO;
 
 namespace BalloonPdf.App;
@@ -14,7 +16,9 @@ public sealed partial class PdfPreviewControl : UserControl
     private const double MaximumPageDisplayWidth = 900d;
 
     private readonly List<(double Width, double Height)> pageSizes = new();
+    private readonly PdfPagePreviewRenderer pagePreviewRenderer = new();
     private IReadOnlyCollection<BalloonAnnotation> annotations = Array.Empty<BalloonAnnotation>();
+    private string? currentPdfPath;
     private int currentPageNumber = 1;
     private double currentScale = 1d;
 
@@ -35,6 +39,7 @@ public sealed partial class PdfPreviewControl : UserControl
     {
         annotations = pageAnnotations ?? Array.Empty<BalloonAnnotation>();
         pageSizes.Clear();
+        currentPdfPath = null;
         currentPageNumber = 1;
 
         if (string.IsNullOrWhiteSpace(pdfPath) || !File.Exists(pdfPath))
@@ -43,6 +48,7 @@ public sealed partial class PdfPreviewControl : UserControl
             return;
         }
 
+        currentPdfPath = pdfPath;
         using var document = PdfReader.Open(pdfPath, PdfDocumentOpenMode.Import);
         for (var index = 0; index < document.PageCount; index++)
         {
@@ -111,21 +117,74 @@ public sealed partial class PdfPreviewControl : UserControl
         };
         PageCanvas.Children.Add(pageBackground);
 
-        var pageLabel = new TextBlock
+        if (!TryAddRenderedPageImage(displayWidth, displayHeight, out var previewErrorMessage))
         {
-            Text = $"Page {currentPageNumber}",
-            Foreground = Brushes.LightGray,
-            FontSize = 18d,
-            IsHitTestVisible = false
-        };
-        Canvas.SetLeft(pageLabel, 16d);
-        Canvas.SetTop(pageLabel, 16d);
-        PageCanvas.Children.Add(pageLabel);
+            AddFallbackPageLabel(previewErrorMessage ?? $"Page {currentPageNumber}");
+        }
 
         foreach (var annotation in annotations.Where(annotation => annotation.PageNumber == currentPageNumber))
         {
             AddAnnotationOverlay(annotation, pageSize.Height);
         }
+    }
+
+    private bool TryAddRenderedPageImage(double displayWidth, double displayHeight, out string? errorMessage)
+    {
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(currentPdfPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var pixelWidth = Math.Max(1, (int)Math.Round(displayWidth));
+            var pixelHeight = Math.Max(1, (int)Math.Round(displayHeight));
+            var preview = pagePreviewRenderer.RenderPage(currentPdfPath, currentPageNumber, pixelWidth, pixelHeight);
+            var bitmap = BitmapSource.Create(
+                preview.PixelWidth,
+                preview.PixelHeight,
+                96d,
+                96d,
+                PixelFormats.Bgra32,
+                null,
+                preview.Pixels,
+                preview.Stride);
+
+            var image = new Image
+            {
+                Source = bitmap,
+                Width = displayWidth,
+                Height = displayHeight,
+                Stretch = Stretch.Fill,
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(image, 0d);
+            Canvas.SetTop(image, 0d);
+            PageCanvas.Children.Add(image);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Preview unavailable: {ex.Message}";
+            return false;
+        }
+    }
+
+    private void AddFallbackPageLabel(string message)
+    {
+        var pageLabel = new TextBlock
+        {
+            Text = message,
+            Foreground = Brushes.LightGray,
+            FontSize = 18d,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = Math.Max(0d, PageCanvas.Width - 32d),
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(pageLabel, 16d);
+        Canvas.SetTop(pageLabel, 16d);
+        PageCanvas.Children.Add(pageLabel);
     }
 
     private void AddAnnotationOverlay(BalloonAnnotation annotation, double pageHeight)

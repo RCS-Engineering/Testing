@@ -1,6 +1,7 @@
 using System.IO;
 using BalloonPdf.App.Models;
 using BalloonPdf.App.Services;
+using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using Xunit;
 
@@ -61,6 +62,24 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         Assert.True(new FileInfo(outputPath).Length > 0);
     }
 
+    [Fact]
+    public void AddBalloons_PreservesSourceTextAndWritesBalloonNumberAsExtractableText()
+    {
+        var inputPath = CreatePdfWithVisibleText("input-with-text.pdf", "SOURCE DRAWING TEXT");
+        var outputPath = Path.Combine(tempDirectory, "output-with-text.pdf");
+        var annotations = new[]
+        {
+            BalloonAnnotation.Create(1, centerX: 100, centerY: 100, balloonNumber: 42, strokeColorHex: "#000000")
+        };
+
+        annotator.AddBalloons(inputPath, outputPath, annotations);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(outputPath);
+        var text = document.GetPage(1).Text;
+        Assert.Contains("SOURCE DRAWING TEXT", text, StringComparison.Ordinal);
+        Assert.Contains("42", text, StringComparison.Ordinal);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(tempDirectory))
@@ -76,6 +95,23 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         var page = document.AddPage();
         page.Width = 200;
         page.Height = 200;
+        document.Save(path);
+        return path;
+    }
+
+    private string CreatePdfWithVisibleText(string fileName, string text)
+    {
+        ArialFontResolver.Register();
+
+        var path = Path.Combine(tempDirectory, fileName);
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Width = 200;
+        page.Height = 200;
+        using var graphics = XGraphics.FromPdfPage(page);
+        var font = new XFont("Arial", 12, XFontStyleEx.Regular);
+        graphics.DrawString(text, font, XBrushes.Black, new XPoint(24, 80));
+        graphics.DrawRectangle(XPens.Black, 24, 100, 60, 30);
         document.Save(path);
         return path;
     }
