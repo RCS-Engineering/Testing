@@ -45,4 +45,50 @@ public sealed class DimensionDetectorTests
     {
         Assert.False(DimensionDetector.IsLikelyDimension(text));
     }
+
+    [Fact]
+    public void IsInBottomRightDetailsBox_ReturnsTrueForCandidateCenteredInsideDetailsBox()
+    {
+        Assert.True(DimensionDetector.IsInBottomRightDetailsBox(
+            left: 800d,
+            bottom: 80d,
+            right: 840d,
+            top: 100d,
+            pageWidth: 1000d,
+            pageHeight: 800d));
+    }
+
+    [Theory]
+    [InlineData(650d, 80d, 690d, 100d)]
+    [InlineData(800d, 240d, 840d, 260d)]
+    public void IsInBottomRightDetailsBox_ReturnsFalseForCandidateOutsideDetailsBox(
+        double left,
+        double bottom,
+        double right,
+        double top)
+    {
+        Assert.False(DimensionDetector.IsInBottomRightDetailsBox(
+            left,
+            bottom,
+            right,
+            top,
+            pageWidth: 1000d,
+            pageHeight: 800d));
+    }
+
+    [Theory]
+    [InlineData(0d, 800d)]
+    [InlineData(1000d, 0d)]
+    [InlineData(-1000d, 800d)]
+    [InlineData(1000d, -800d)]
+    public void IsInBottomRightDetailsBox_ReturnsFalseForInvalidPageDimensions(double pageWidth, double pageHeight)
+    {
+        Assert.False(DimensionDetector.IsInBottomRightDetailsBox(
+            left: 800d,
+            bottom: 80d,
+            right: 840d,
+            top: 100d,
+            pageWidth: pageWidth,
+            pageHeight: pageHeight));
+    }
 }

@@ -6,6 +6,9 @@ namespace BalloonPdf.App.Services;
 
 public sealed class DimensionDetector
 {
+    private const double DetailsBoxMinimumCenterXRatio = 0.72d;
+    private const double DetailsBoxMaximumCenterYRatio = 0.25d;
+
     private static readonly Regex DimensionRegex = new(
         @"^(?:(?:[Ø⌀]|%%c|dia\.?|diam\.?|r)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)|(?:\.\d+|\d+\.\d+|\d+\s*/\s*\d+)|\d+(?:\.\d+)?\s*(?:°|deg|degrees)|(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(?:±|\+/-)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+))$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
@@ -19,6 +22,8 @@ public sealed class DimensionDetector
 
         foreach (var page in document.GetPages())
         {
+            var pageWidth = page.Width;
+            var pageHeight = page.Height;
             var words = page.GetWords()
                 .Select(word => new WordCandidate(
                     page.Number,
@@ -37,12 +42,17 @@ public sealed class DimensionDetector
                 var word = words[i];
                 if (i + 1 < words.Count && TryCombineTolerance(word, words[i + 1], out var combined) && IsLikelyDimension(combined.Text))
                 {
-                    candidates.Add(combined.ToDimensionCandidate());
+                    if (!IsInBottomRightDetailsBox(combined.Left, combined.Bottom, combined.Right, combined.Top, pageWidth, pageHeight))
+                    {
+                        candidates.Add(combined.ToDimensionCandidate());
+                    }
+
                     i++;
                     continue;
                 }
 
-                if (IsLikelyDimension(word.Text))
+                if (IsLikelyDimension(word.Text)
+                    && !IsInBottomRightDetailsBox(word.Left, word.Bottom, word.Right, word.Top, pageWidth, pageHeight))
                 {
                     candidates.Add(word.ToDimensionCandidate());
                 }
@@ -66,6 +76,25 @@ public sealed class DimensionDetector
             .ThenBy(candidate => candidate.Left)
             .Select((candidate, index) => candidate with { BalloonNumber = index + 1 })
             .ToList();
+    }
+
+    internal static bool IsInBottomRightDetailsBox(
+        double left,
+        double bottom,
+        double right,
+        double top,
+        double pageWidth,
+        double pageHeight)
+    {
+        if (pageWidth <= 0d || pageHeight <= 0d)
+        {
+            return false;
+        }
+
+        var centerX = left + ((right - left) / 2d);
+        var centerY = bottom + ((top - bottom) / 2d);
+        return centerX >= pageWidth * DetailsBoxMinimumCenterXRatio
+            && centerY <= pageHeight * DetailsBoxMaximumCenterYRatio;
     }
 
     private static bool TryCombineTolerance(WordCandidate first, WordCandidate second, out WordCandidate combined)
