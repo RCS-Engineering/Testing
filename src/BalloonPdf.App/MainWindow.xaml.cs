@@ -131,7 +131,7 @@ public partial class MainWindow : Window
             SetStatus("Writing Excel dimension workbook...");
             await Task.Run(() => excelExporter.Export(excelOutputPath, dimensions));
 
-            InlinePreview.LoadPdf(outputPath, currentAnnotations);
+            InlinePreview.LoadPdf(inputPath, currentAnnotations);
             ExpandEditButton.IsEnabled = true;
             OpenPdfButton.IsEnabled = true;
             SetStatus($"Created ballooned PDF: {outputPath}\nCreated Excel workbook: {excelOutputPath}");
@@ -154,7 +154,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var editor = new BalloonEditorWindow(currentOutputPath, currentAnnotations)
+        var editor = new BalloonEditorWindow(currentInputPath, currentAnnotations)
         {
             Owner = this
         };
@@ -172,7 +172,7 @@ public partial class MainWindow : Window
             SetStatus("Saving edited balloons and regenerating PDF...");
             currentAnnotations = editor.SavedAnnotations;
             await Task.Run(() => balloonAnnotator.AddBalloons(currentInputPath, currentOutputPath, currentAnnotations));
-            InlinePreview.LoadPdf(currentOutputPath, currentAnnotations);
+            InlinePreview.LoadPdf(currentInputPath, currentAnnotations);
             SetStatus($"Saved edited ballooned PDF: {currentOutputPath}");
         }
         catch (Exception ex)
