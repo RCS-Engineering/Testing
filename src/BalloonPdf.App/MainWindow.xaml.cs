@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using BalloonPdf.App.Models;
 using BalloonPdf.App.Services;
 using Microsoft.Win32;
 
@@ -8,9 +10,15 @@ namespace BalloonPdf.App;
 public partial class MainWindow : Window
 {
     private readonly DimensionDetector dimensionDetector = new();
+    private readonly BalloonAnnotationService annotationService = new();
     private readonly PdfBalloonAnnotator balloonAnnotator = new();
     private readonly ExcelDimensionExporter excelExporter = new();
     private readonly OutputPathService outputPathService = new();
+
+    private string? currentInputPath;
+    private string? currentOutputPath;
+    private IReadOnlyList<DimensionCandidate> currentDimensions = Array.Empty<DimensionCandidate>();
+    private IReadOnlyList<BalloonAnnotation> currentAnnotations = Array.Empty<BalloonAnnotation>();
 
     public MainWindow()
     {
@@ -35,6 +43,13 @@ public partial class MainWindow : Window
         InputPathTextBox.Text = dialog.FileName;
         OutputPathTextBox.Text = outputPathService.GetDefaultOutputPath(dialog.FileName);
         ExcelOutputPathTextBox.Text = outputPathService.GetDefaultExcelOutputPath(dialog.FileName);
+        currentInputPath = null;
+        currentOutputPath = null;
+        currentDimensions = Array.Empty<DimensionCandidate>();
+        currentAnnotations = Array.Empty<BalloonAnnotation>();
+        ExpandEditButton.IsEnabled = false;
+        OpenPdfButton.IsEnabled = false;
+        InlinePreview.LoadPdf(null);
         SetStatus("Input selected. Choose Generate to create a ballooned PDF and Excel workbook.");
     }
 
@@ -105,12 +120,20 @@ public partial class MainWindow : Window
                 return;
             }
 
+            currentInputPath = inputPath;
+            currentOutputPath = outputPath;
+            currentDimensions = dimensions;
+            currentAnnotations = annotationService.CreateFromDimensions(dimensions);
+
             SetStatus($"Detected {dimensions.Count} dimensions. Writing ballooned PDF...");
-            await Task.Run(() => balloonAnnotator.AddBalloons(inputPath, outputPath, dimensions));
+            await Task.Run(() => balloonAnnotator.AddBalloons(inputPath, outputPath, currentAnnotations));
 
             SetStatus("Writing Excel dimension workbook...");
             await Task.Run(() => excelExporter.Export(excelOutputPath, dimensions));
 
+            InlinePreview.LoadPdf(outputPath, currentAnnotations);
+            ExpandEditButton.IsEnabled = true;
+            OpenPdfButton.IsEnabled = true;
             SetStatus($"Created ballooned PDF: {outputPath}\nCreated Excel workbook: {excelOutputPath}");
         }
         catch (Exception ex)
@@ -121,6 +144,62 @@ public partial class MainWindow : Window
         {
             GenerateButton.IsEnabled = true;
         }
+    }
+
+    private async void ExpandEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(currentInputPath) || string.IsNullOrWhiteSpace(currentOutputPath) || currentAnnotations.Count == 0)
+        {
+            SetStatus("Generate a ballooned PDF before opening the editor.");
+            return;
+        }
+
+        var editor = new BalloonEditorWindow(currentOutputPath, currentAnnotations)
+        {
+            Owner = this
+        };
+
+        if (editor.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            ExpandEditButton.IsEnabled = false;
+            OpenPdfButton.IsEnabled = false;
+            GenerateButton.IsEnabled = false;
+            SetStatus("Saving edited balloons and regenerating PDF...");
+            currentAnnotations = editor.SavedAnnotations;
+            await Task.Run(() => balloonAnnotator.AddBalloons(currentInputPath, currentOutputPath, currentAnnotations));
+            InlinePreview.LoadPdf(currentOutputPath, currentAnnotations);
+            SetStatus($"Saved edited ballooned PDF: {currentOutputPath}");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Unable to save edited PDF: {ex.Message}");
+        }
+        finally
+        {
+            GenerateButton.IsEnabled = true;
+            ExpandEditButton.IsEnabled = currentAnnotations.Count > 0;
+            OpenPdfButton.IsEnabled = !string.IsNullOrWhiteSpace(currentOutputPath) && File.Exists(currentOutputPath);
+        }
+    }
+
+    private void OpenPdf_Click(object sender, RoutedEventArgs e)
+    {
+        var outputPath = currentOutputPath ?? OutputPathTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(outputPath) || !File.Exists(outputPath))
+        {
+            SetStatus("Generate a ballooned PDF before opening it.");
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo(outputPath)
+        {
+            UseShellExecute = true
+        });
     }
 
     private bool ValidatePaths(string inputPath, string outputPath, string excelOutputPath)

@@ -9,7 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <Compile Remove="App.xaml.cs;MainWindow.xaml.cs" />
+    <Compile Remove="App.xaml.cs;MainWindow.xaml.cs;BalloonEditorWindow.xaml.cs;PdfPreviewControl.xaml.cs" />
+    <Page Remove="App.xaml;MainWindow.xaml;BalloonEditorWindow.xaml;PdfPreviewControl.xaml" />
   </ItemGroup>
 
   <ItemGroup>
