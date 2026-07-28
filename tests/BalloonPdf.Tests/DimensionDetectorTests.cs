@@ -17,7 +17,10 @@ public sealed class DimensionDetectorTests
         ".250",
         "10 ±0.1",
         "10+/-0.1",
-        "DIA. 8"
+        "DIA. 8",
+        "M8",
+        "4xM8",
+        "4XM8"
     };
 
     public static TheoryData<string> RejectedText => new()
