@@ -100,6 +100,7 @@ public sealed class ImageDimensionDetectorTests : IDisposable
             new ImageTextWord("Part18", Left: 750, Top: 650, Right: 830, Bottom: 670),
             new ImageTextWord("Image", Left: 100, Top: 735, Right: 155, Bottom: 755),
             new ImageTextWord("ID", Left: 160, Top: 735, Right: 185, Bottom: 755),
+            new ImageTextWord("18", Left: 500, Top: 740, Right: 525, Bottom: 760),
             new ImageTextWord("1/1", Left: 800, Top: 710, Right: 840, Bottom: 730)
         }));
 
