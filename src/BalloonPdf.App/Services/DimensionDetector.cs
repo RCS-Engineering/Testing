@@ -1,6 +1,10 @@
+using System.IO;
 using System.Text.RegularExpressions;
 using BalloonPdf.App.Models;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace BalloonPdf.App.Services;
 
@@ -8,6 +12,9 @@ public sealed class DimensionDetector
 {
     private const double DetailsBoxMinimumCenterXRatio = 0.72d;
     private const double DetailsBoxMaximumCenterYRatio = 0.25d;
+    private const int SparsePdfPageDimensionThreshold = 1;
+    private const double OcrFallbackRenderScale = 2d;
+    private const int OcrFallbackMaximumPixelSide = 2400;
 
     private static readonly Regex DimensionRegex = new(
         @"^(?:(?:[Ø⌀]|%%c|dia\.?|diam\.?|r)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)|(?:\d+\s*x\s*)?m\s*\d+|(?:\.\d+|\d+\.\d+|\d+\s*/\s*\d+)|\d+(?:\.\d+)?\s*(?:°|deg|degrees)|(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(?:±|\+/-)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+))$",
@@ -37,51 +44,160 @@ public sealed class DimensionDetector
         };
     }
 
-    private static IReadOnlyList<DimensionCandidate> DetectPdf(string pdfPath)
+    private IReadOnlyList<DimensionCandidate> DetectPdf(string pdfPath)
     {
         using var document = PdfDocument.Open(pdfPath);
         var candidates = new List<DimensionCandidate>();
 
         foreach (var page in document.GetPages())
         {
-            var pageWidth = page.Width;
-            var pageHeight = page.Height;
-            var words = page.GetWords()
-                .Select(word => new WordCandidate(
-                    page.Number,
-                    word.Text,
-                    word.BoundingBox.Left,
-                    word.BoundingBox.Bottom,
-                    word.BoundingBox.Right,
-                    word.BoundingBox.Top))
-                .Where(word => !string.IsNullOrWhiteSpace(word.Text))
-                .OrderByDescending(word => word.Top)
-                .ThenBy(word => word.Left)
-                .ToList();
+            var vectorPageCandidates = DetectPdfPageVectorCandidates(page);
+            var pageCandidates = TryDetectPdfPageWithOcrFallback(
+                pdfPath,
+                page.Number,
+                page.Width,
+                page.Height,
+                vectorPageCandidates,
+                out var ocrPageCandidates)
+                ? ocrPageCandidates
+                : vectorPageCandidates;
 
-            for (var i = 0; i < words.Count; i++)
-            {
-                var word = words[i];
-                if (i + 1 < words.Count && TryCombineTolerance(word, words[i + 1], out var combined) && IsLikelyDimension(combined.Text))
-                {
-                    if (!IsInBottomRightDetailsBox(combined.Left, combined.Bottom, combined.Right, combined.Top, pageWidth, pageHeight))
-                    {
-                        candidates.Add(combined.ToDimensionCandidate());
-                    }
-
-                    i++;
-                    continue;
-                }
-
-                if (IsLikelyDimension(word.Text)
-                    && !IsInBottomRightDetailsBox(word.Left, word.Bottom, word.Right, word.Top, pageWidth, pageHeight))
-                {
-                    candidates.Add(word.ToDimensionCandidate());
-                }
-            }
+            candidates.AddRange(pageCandidates);
         }
 
         return AssignReadingOrder(candidates);
+    }
+
+    private static List<DimensionCandidate> DetectPdfPageVectorCandidates(Page page)
+    {
+        var pageWidth = page.Width;
+        var pageHeight = page.Height;
+        var candidates = new List<DimensionCandidate>();
+        var words = page.GetWords()
+            .Select(word => new WordCandidate(
+                page.Number,
+                word.Text,
+                word.BoundingBox.Left,
+                word.BoundingBox.Bottom,
+                word.BoundingBox.Right,
+                word.BoundingBox.Top))
+            .Where(word => !string.IsNullOrWhiteSpace(word.Text))
+            .OrderByDescending(word => word.Top)
+            .ThenBy(word => word.Left)
+            .ToList();
+
+        for (var i = 0; i < words.Count; i++)
+        {
+            var word = words[i];
+            if (i + 1 < words.Count && TryCombineTolerance(word, words[i + 1], out var combined) && IsLikelyDimension(combined.Text))
+            {
+                if (!IsInBottomRightDetailsBox(combined.Left, combined.Bottom, combined.Right, combined.Top, pageWidth, pageHeight))
+                {
+                    candidates.Add(combined.ToDimensionCandidate());
+                }
+
+                i++;
+                continue;
+            }
+
+            if (IsLikelyDimension(word.Text)
+                && !IsInBottomRightDetailsBox(word.Left, word.Bottom, word.Right, word.Top, pageWidth, pageHeight))
+            {
+                candidates.Add(word.ToDimensionCandidate());
+            }
+        }
+
+        return candidates;
+    }
+
+    private bool TryDetectPdfPageWithOcrFallback(
+        string pdfPath,
+        int pageNumber,
+        double pageWidth,
+        double pageHeight,
+        IReadOnlyList<DimensionCandidate> vectorPageCandidates,
+        out IReadOnlyList<DimensionCandidate> ocrPageCandidates)
+    {
+        ocrPageCandidates = Array.Empty<DimensionCandidate>();
+        if (vectorPageCandidates.Count > SparsePdfPageDimensionThreshold)
+        {
+            return false;
+        }
+
+        try
+        {
+            var imagePath = RenderPdfPageToTemporaryImage(pdfPath, pageNumber, pageWidth, pageHeight, out var imageWidth, out var imageHeight);
+            try
+            {
+                ocrPageCandidates = imageDimensionDetector.Detect(imagePath)
+                    .Select(candidate => MapImageCandidateToPdfPage(candidate, pageNumber, pageWidth, pageHeight, imageWidth, imageHeight))
+                    .ToList();
+            }
+            finally
+            {
+                File.Delete(imagePath);
+            }
+        }
+        catch (InvalidOperationException) when (vectorPageCandidates.Count > 0)
+        {
+            return false;
+        }
+
+        return ocrPageCandidates.Count > vectorPageCandidates.Count;
+    }
+
+    private static string RenderPdfPageToTemporaryImage(
+        string pdfPath,
+        int pageNumber,
+        double pageWidth,
+        double pageHeight,
+        out int imageWidth,
+        out int imageHeight)
+    {
+        var (pixelWidth, pixelHeight) = GetOcrFallbackRenderSize(pageWidth, pageHeight);
+        var preview = new PdfPagePreviewRenderer().RenderPage(pdfPath, pageNumber, pixelWidth, pixelHeight);
+        imageWidth = preview.PixelWidth;
+        imageHeight = preview.PixelHeight;
+
+        var directory = Path.Combine(Path.GetTempPath(), "BalloonPdf", "OcrFallback");
+        Directory.CreateDirectory(directory);
+        var imagePath = Path.Combine(directory, $"{Guid.NewGuid():N}.png");
+        using var image = Image.LoadPixelData<Bgra32>(preview.Pixels, preview.PixelWidth, preview.PixelHeight);
+        image.SaveAsPng(imagePath);
+        return imagePath;
+    }
+
+    private static (int Width, int Height) GetOcrFallbackRenderSize(double pageWidth, double pageHeight)
+    {
+        if (pageWidth <= 0d || pageHeight <= 0d)
+        {
+            return (1, 1);
+        }
+
+        var scale = Math.Min(OcrFallbackRenderScale, OcrFallbackMaximumPixelSide / Math.Max(pageWidth, pageHeight));
+        return (
+            Math.Max(1, (int)Math.Round(pageWidth * scale)),
+            Math.Max(1, (int)Math.Round(pageHeight * scale)));
+    }
+
+    private static DimensionCandidate MapImageCandidateToPdfPage(
+        DimensionCandidate candidate,
+        int pageNumber,
+        double pageWidth,
+        double pageHeight,
+        int imageWidth,
+        int imageHeight)
+    {
+        var widthScale = pageWidth / imageWidth;
+        var heightScale = pageHeight / imageHeight;
+        return new DimensionCandidate(
+            pageNumber,
+            candidate.Text,
+            candidate.Left * widthScale,
+            candidate.Bottom * heightScale,
+            candidate.Right * widthScale,
+            candidate.Top * heightScale,
+            0);
     }
 
     internal static bool IsLikelyDimension(string text)
