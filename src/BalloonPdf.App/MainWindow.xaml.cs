@@ -29,8 +29,8 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Choose input PDF",
-            Filter = "PDF files (*.pdf)|*.pdf|All files (*.*)|*.*",
+            Title = "Choose source drawing",
+            Filter = InputDocumentFormatExtensions.SupportedFileDialogFilter,
             CheckFileExists = true,
             Multiselect = false
         };
@@ -49,8 +49,8 @@ public partial class MainWindow : Window
         currentAnnotations = Array.Empty<BalloonAnnotation>();
         ExpandEditButton.IsEnabled = false;
         OpenPdfButton.IsEnabled = false;
-        InlinePreview.LoadPdf(null);
-        SetStatus("Input selected. Choose Generate to create a ballooned PDF and Excel workbook.");
+        InlinePreview.LoadDocument(null);
+        SetStatus("Source drawing selected. Choose Generate to create a ballooned PDF and Excel workbook.");
     }
 
     private void SelectOutput_Click(object sender, RoutedEventArgs e)
@@ -111,12 +111,13 @@ public partial class MainWindow : Window
         try
         {
             GenerateButton.IsEnabled = false;
-            SetStatus("Detecting vector-text dimensions...");
+            var inputFormat = InputDocumentFormatExtensions.FromPath(inputPath);
+            SetStatus(inputFormat == InputDocumentFormat.Pdf ? "Detecting vector-text dimensions..." : "Detecting raster text dimensions with OCR...");
 
             var dimensions = await Task.Run(() => dimensionDetector.Detect(inputPath));
             if (dimensions.Count == 0)
             {
-                SetStatus("No vector-text dimensions were detected. Scanned-image/OCR detection is not supported in this version.");
+                SetStatus("No dimensions were detected in the source drawing.");
                 return;
             }
 
@@ -131,7 +132,7 @@ public partial class MainWindow : Window
             SetStatus("Writing Excel dimension workbook...");
             await Task.Run(() => excelExporter.Export(excelOutputPath, dimensions));
 
-            InlinePreview.LoadPdf(inputPath, currentAnnotations);
+            InlinePreview.LoadDocument(inputPath, currentAnnotations);
             ExpandEditButton.IsEnabled = true;
             OpenPdfButton.IsEnabled = true;
             SetStatus($"Created ballooned PDF: {outputPath}\nCreated Excel workbook: {excelOutputPath}");
@@ -150,7 +151,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(currentInputPath) || string.IsNullOrWhiteSpace(currentOutputPath) || currentAnnotations.Count == 0)
         {
-            SetStatus("Generate a ballooned PDF before opening the editor.");
+            SetStatus("Generate a ballooned drawing before opening the editor.");
             return;
         }
 
@@ -172,7 +173,7 @@ public partial class MainWindow : Window
             SetStatus("Saving edited balloons and regenerating PDF...");
             currentAnnotations = editor.SavedAnnotations;
             await Task.Run(() => balloonAnnotator.AddBalloons(currentInputPath, currentOutputPath, currentAnnotations));
-            InlinePreview.LoadPdf(currentInputPath, currentAnnotations);
+            InlinePreview.LoadDocument(currentInputPath, currentAnnotations);
             SetStatus($"Saved edited ballooned PDF: {currentOutputPath}");
         }
         catch (Exception ex)
@@ -206,13 +207,19 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(inputPath))
         {
-            SetStatus("Choose an input PDF first.");
+            SetStatus("Choose a source drawing first.");
             return false;
         }
 
         if (!File.Exists(inputPath))
         {
-            SetStatus("The selected input PDF does not exist.");
+            SetStatus("The selected source drawing does not exist.");
+            return false;
+        }
+
+        if (!InputDocumentFormatExtensions.IsSupported(inputPath))
+        {
+            SetStatus("Choose a PDF, JPG, or JPEG source drawing.");
             return false;
         }
 
@@ -224,7 +231,7 @@ public partial class MainWindow : Window
 
         if (Path.GetFullPath(inputPath).Equals(Path.GetFullPath(outputPath), StringComparison.OrdinalIgnoreCase))
         {
-            SetStatus("The output PDF must be separate from the input PDF.");
+            SetStatus("The output PDF must be separate from the source drawing.");
             return false;
         }
 
@@ -236,7 +243,7 @@ public partial class MainWindow : Window
 
         if (Path.GetFullPath(inputPath).Equals(Path.GetFullPath(excelOutputPath), StringComparison.OrdinalIgnoreCase))
         {
-            SetStatus("The output Excel workbook must be separate from the input PDF.");
+            SetStatus("The output Excel workbook must be separate from the source drawing.");
             return false;
         }
 

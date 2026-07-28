@@ -4,6 +4,7 @@ using BalloonPdf.App.Models;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
+using SixLabors.ImageSharp;
 
 namespace BalloonPdf.App.Services;
 
@@ -18,23 +19,23 @@ public sealed class PdfBalloonAnnotator
 
     private readonly BalloonAnnotationService annotationService = new();
 
-    public void AddBalloons(string inputPdfPath, string outputPdfPath, IReadOnlyCollection<DimensionCandidate> dimensions)
+    public void AddBalloons(string inputPath, string outputPdfPath, IReadOnlyCollection<DimensionCandidate> dimensions)
     {
         ArgumentNullException.ThrowIfNull(dimensions);
-        AddBalloons(inputPdfPath, outputPdfPath, annotationService.CreateFromDimensions(dimensions));
+        AddBalloons(inputPath, outputPdfPath, annotationService.CreateFromDimensions(dimensions));
     }
 
-    public void AddBalloons(string inputPdfPath, string outputPdfPath, IReadOnlyCollection<BalloonAnnotation> annotations)
+    public void AddBalloons(string inputPath, string outputPdfPath, IReadOnlyCollection<BalloonAnnotation> annotations)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(inputPdfPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(inputPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPdfPath);
         ArgumentNullException.ThrowIfNull(annotations);
 
-        var inputFullPath = Path.GetFullPath(inputPdfPath);
+        var inputFullPath = Path.GetFullPath(inputPath);
         var outputFullPath = Path.GetFullPath(outputPdfPath);
         if (inputFullPath.Equals(outputFullPath, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("The output PDF path must be different from the input PDF path.");
+            throw new InvalidOperationException("The output PDF path must be different from the input path.");
         }
 
         var outputDirectory = Path.GetDirectoryName(outputFullPath);
@@ -43,8 +44,25 @@ public sealed class PdfBalloonAnnotator
             Directory.CreateDirectory(outputDirectory);
         }
 
-        using var input = PdfReader.Open(inputFullPath, PdfDocumentOpenMode.Import);
         using var output = new PdfDocument();
+        switch (InputDocumentFormatExtensions.FromPath(inputFullPath))
+        {
+            case InputDocumentFormat.Pdf:
+                AddPdfPages(inputFullPath, output, annotations);
+                break;
+            case InputDocumentFormat.Jpeg:
+                AddImagePage(inputFullPath, output, annotations);
+                break;
+            default:
+                throw new NotSupportedException("Supported input formats are PDF, JPG, and JPEG.");
+        }
+
+        output.Save(outputFullPath);
+    }
+
+    private static void AddPdfPages(string inputFullPath, PdfDocument output, IReadOnlyCollection<BalloonAnnotation> annotations)
+    {
+        using var input = PdfReader.Open(inputFullPath, PdfDocumentOpenMode.Import);
         output.Info.Title = input.Info.Title;
         output.Info.Author = input.Info.Author;
         output.Info.Subject = input.Info.Subject;
@@ -55,8 +73,22 @@ public sealed class PdfBalloonAnnotator
             var page = output.AddPage(input.Pages[pageIndex]);
             DrawPageBalloons(page, annotations.Where(annotation => annotation.PageNumber == pageIndex + 1));
         }
+    }
 
-        output.Save(outputFullPath);
+    private static void AddImagePage(string inputFullPath, PdfDocument output, IReadOnlyCollection<BalloonAnnotation> annotations)
+    {
+        var imageInfo = Image.Identify(inputFullPath) ?? throw new InvalidOperationException("The selected image could not be decoded.");
+        var page = output.AddPage();
+        page.Width = XUnit.FromPoint(imageInfo.Width);
+        page.Height = XUnit.FromPoint(imageInfo.Height);
+
+        using (var graphics = XGraphics.FromPdfPage(page))
+        using (var image = XImage.FromFile(inputFullPath))
+        {
+            graphics.DrawImage(image, 0d, 0d, imageInfo.Width, imageInfo.Height);
+        }
+
+        DrawPageBalloons(page, annotations.Where(annotation => annotation.PageNumber == 1));
     }
 
     private static void DrawPageBalloons(PdfPage page, IEnumerable<BalloonAnnotation> annotations)

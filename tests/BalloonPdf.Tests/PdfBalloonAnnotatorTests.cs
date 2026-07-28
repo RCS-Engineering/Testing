@@ -3,6 +3,8 @@ using BalloonPdf.App.Models;
 using BalloonPdf.App.Services;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
 
 namespace BalloonPdf.Tests;
@@ -81,6 +83,24 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
     }
 
     [Fact]
+    public void AddBalloons_CreatesRenderablePdfFromJpegInput()
+    {
+        var inputPath = CreateJpegWithBlackRectangle("input.jpg");
+        var outputPath = Path.Combine(tempDirectory, "image-output.pdf");
+        var annotations = new[]
+        {
+            BalloonAnnotation.Create(1, centerX: 100, centerY: 80, balloonNumber: 7, strokeColorHex: "#000000")
+        };
+
+        annotator.AddBalloons(inputPath, outputPath, annotations);
+
+        Assert.True(File.Exists(outputPath));
+        var preview = new PdfPagePreviewRenderer().RenderPage(outputPath, pageNumber: 1, pixelWidth: 160, pixelHeight: 120);
+        Assert.Equal(PdfPagePreviewPixelFormat.Bgra32, preview.PixelFormat);
+        Assert.True(new FileInfo(outputPath).Length > 0);
+    }
+
+    [Fact]
     public void AddBalloons_RasterizesBalloonNumberAsDenseFilledGlyphs()
     {
         var inputPath = CreateBlankPdf("input-for-rasterized-number.pdf");
@@ -128,6 +148,22 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         }
 
         return count;
+    }
+
+    private string CreateJpegWithBlackRectangle(string fileName)
+    {
+        var path = Path.Combine(tempDirectory, fileName);
+        using var image = new Image<Rgba32>(160, 120, Color.White);
+        for (var y = 25; y < 75; y++)
+        {
+            for (var x = 20; x < 100; x++)
+            {
+                image[x, y] = Color.Black;
+            }
+        }
+
+        image.SaveAsJpeg(path);
+        return path;
     }
 
     private string CreateBlankPdf(string fileName)

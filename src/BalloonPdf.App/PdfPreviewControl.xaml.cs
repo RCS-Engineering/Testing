@@ -18,7 +18,7 @@ public sealed partial class PdfPreviewControl : UserControl
     private readonly List<(double Width, double Height)> pageSizes = new();
     private readonly PdfPagePreviewRenderer pagePreviewRenderer = new();
     private IReadOnlyCollection<BalloonAnnotation> annotations = Array.Empty<BalloonAnnotation>();
-    private string? currentPdfPath;
+    private string? currentInputPath;
     private int currentPageNumber = 1;
     private double currentScale = 1d;
 
@@ -37,23 +37,42 @@ public sealed partial class PdfPreviewControl : UserControl
 
     public void LoadPdf(string? pdfPath, IReadOnlyCollection<BalloonAnnotation>? pageAnnotations = null)
     {
+        LoadDocument(pdfPath, pageAnnotations);
+    }
+
+    public void LoadDocument(string? inputPath, IReadOnlyCollection<BalloonAnnotation>? pageAnnotations = null)
+    {
         annotations = pageAnnotations ?? Array.Empty<BalloonAnnotation>();
         pageSizes.Clear();
-        currentPdfPath = null;
+        currentInputPath = null;
         currentPageNumber = 1;
 
-        if (string.IsNullOrWhiteSpace(pdfPath) || !File.Exists(pdfPath))
+        if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
         {
-            RenderEmpty("Choose and generate a PDF to preview balloons.");
+            RenderEmpty("Choose and generate a source drawing to preview balloons.");
             return;
         }
 
-        currentPdfPath = pdfPath;
-        using var document = PdfReader.Open(pdfPath, PdfDocumentOpenMode.Import);
-        for (var index = 0; index < document.PageCount; index++)
+        currentInputPath = inputPath;
+        switch (InputDocumentFormatExtensions.FromPath(inputPath))
         {
-            var page = document.Pages[index];
-            pageSizes.Add((page.Width.Point, page.Height.Point));
+            case InputDocumentFormat.Pdf:
+                using (var document = PdfReader.Open(inputPath, PdfDocumentOpenMode.Import))
+                {
+                    for (var index = 0; index < document.PageCount; index++)
+                    {
+                        var page = document.Pages[index];
+                        pageSizes.Add((page.Width.Point, page.Height.Point));
+                    }
+                }
+
+                break;
+            case InputDocumentFormat.Jpeg:
+                var imageInfo = SixLabors.ImageSharp.Image.Identify(inputPath) ?? throw new InvalidOperationException("The selected image could not be decoded.");
+                pageSizes.Add((imageInfo.Width, imageInfo.Height));
+                break;
+            default:
+                throw new NotSupportedException("Supported input formats are PDF, JPG, and JPEG.");
         }
 
         RenderCurrentPage();
@@ -94,7 +113,7 @@ public sealed partial class PdfPreviewControl : UserControl
         PageCanvas.Children.Clear();
         if (pageSizes.Count == 0)
         {
-            RenderEmpty("Choose and generate a PDF to preview balloons.");
+            RenderEmpty("Choose and generate a source drawing to preview balloons.");
             return;
         }
 
@@ -131,7 +150,7 @@ public sealed partial class PdfPreviewControl : UserControl
     private bool TryAddRenderedPageImage(double displayWidth, double displayHeight, out string? errorMessage)
     {
         errorMessage = null;
-        if (string.IsNullOrWhiteSpace(currentPdfPath))
+        if (string.IsNullOrWhiteSpace(currentInputPath))
         {
             return false;
         }
@@ -140,7 +159,7 @@ public sealed partial class PdfPreviewControl : UserControl
         {
             var pixelWidth = Math.Max(1, (int)Math.Round(displayWidth));
             var pixelHeight = Math.Max(1, (int)Math.Round(displayHeight));
-            var preview = pagePreviewRenderer.RenderPage(currentPdfPath, currentPageNumber, pixelWidth, pixelHeight);
+            var preview = pagePreviewRenderer.RenderPage(currentInputPath, currentPageNumber, pixelWidth, pixelHeight);
             var bitmap = BitmapSource.Create(
                 preview.PixelWidth,
                 preview.PixelHeight,

@@ -13,10 +13,32 @@ public sealed class DimensionDetector
         @"^(?:(?:[Ø⌀]|%%c|dia\.?|diam\.?|r)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)|(?:\.\d+|\d+\.\d+|\d+\s*/\s*\d+)|\d+(?:\.\d+)?\s*(?:°|deg|degrees)|(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(?:±|\+/-)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+))$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
-    public IReadOnlyList<DimensionCandidate> Detect(string pdfPath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(pdfPath);
+    private readonly ImageDimensionDetector imageDimensionDetector;
 
+    public DimensionDetector()
+        : this(new ImageDimensionDetector())
+    {
+    }
+
+    public DimensionDetector(ImageDimensionDetector imageDimensionDetector)
+    {
+        this.imageDimensionDetector = imageDimensionDetector ?? throw new ArgumentNullException(nameof(imageDimensionDetector));
+    }
+
+    public IReadOnlyList<DimensionCandidate> Detect(string inputPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(inputPath);
+
+        return InputDocumentFormatExtensions.FromPath(inputPath) switch
+        {
+            InputDocumentFormat.Pdf => DetectPdf(inputPath),
+            InputDocumentFormat.Jpeg => imageDimensionDetector.Detect(inputPath),
+            _ => throw new NotSupportedException("Supported input formats are PDF, JPG, and JPEG.")
+        };
+    }
+
+    private static IReadOnlyList<DimensionCandidate> DetectPdf(string pdfPath)
+    {
         using var document = PdfDocument.Open(pdfPath);
         var candidates = new List<DimensionCandidate>();
 

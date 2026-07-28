@@ -2,6 +2,8 @@ using System.IO;
 using BalloonPdf.App.Services;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
 
 namespace BalloonPdf.Tests;
@@ -38,6 +40,16 @@ public sealed class PdfPagePreviewRendererTests : IDisposable
         Assert.Equal(preview.Stride * preview.PixelHeight, preview.Pixels.Length);
         Assert.True(preview.PixelWidth > preview.PixelHeight);
         AssertPreviewContainsVisibleSourceContent(preview, expectedWidth: preview.PixelWidth, expectedHeight: preview.PixelHeight);
+    }
+
+    [Fact]
+    public void RenderPage_RendersJpegPixelsWithVisibleSourceContent()
+    {
+        var imagePath = CreateJpegWithBlackRectangle("preview-source.jpg");
+
+        var preview = renderer.RenderPage(imagePath, pageNumber: 1, pixelWidth: 120, pixelHeight: 120);
+
+        AssertPreviewContainsVisibleSourceContent(preview, expectedWidth: 120, expectedHeight: 80);
     }
 
     [Fact]
@@ -85,6 +97,22 @@ public sealed class PdfPagePreviewRendererTests : IDisposable
         using var graphics = XGraphics.FromPdfPage(page);
         graphics.DrawRectangle(XBrushes.Black, 20, 20, 60, 40);
         document.Save(path);
+        return path;
+    }
+
+    private string CreateJpegWithBlackRectangle(string fileName)
+    {
+        var path = Path.Combine(tempDirectory, fileName);
+        using var image = new Image<Rgba32>(120, 80, Color.White);
+        for (var y = 20; y < 60; y++)
+        {
+            for (var x = 15; x < 90; x++)
+            {
+                image[x, y] = Color.Black;
+            }
+        }
+
+        image.SaveAsJpeg(path);
         return path;
     }
 
