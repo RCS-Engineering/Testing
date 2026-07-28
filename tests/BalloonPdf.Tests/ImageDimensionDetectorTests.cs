@@ -83,6 +83,84 @@ public sealed class ImageDimensionDetectorTests : IDisposable
             });
     }
 
+    [Fact]
+    public void Detect_AcceptsDrawingAreaWholeNumberDimensionsAndExcludesImageDistractors()
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(new[]
+        {
+            new ImageTextWord("44", Left: 100, Top: 100, Right: 125, Bottom: 120),
+            new ImageTextWord("16", Left: 260, Top: 120, Right: 285, Bottom: 140),
+            new ImageTextWord("Ø120", Left: 500, Top: 140, Right: 555, Bottom: 160),
+            new ImageTextWord("75", Left: 100, Top: 250, Right: 125, Bottom: 270),
+            new ImageTextWord("R5", Left: 400, Top: 260, Right: 425, Bottom: 280),
+            new ImageTextWord("4xM8", Left: 600, Top: 420, Right: 650, Bottom: 440),
+            new ImageTextWord("1", Left: 5, Top: 100, Right: 20, Bottom: 120),
+            new ImageTextWord("2", Left: 500, Top: 5, Right: 515, Bottom: 25),
+            new ImageTextWord("Part18", Left: 750, Top: 650, Right: 830, Bottom: 670),
+            new ImageTextWord("Image", Left: 100, Top: 735, Right: 155, Bottom: 755),
+            new ImageTextWord("ID", Left: 160, Top: 735, Right: 185, Bottom: 755),
+            new ImageTextWord("1/1", Left: 800, Top: 710, Right: 840, Bottom: 730)
+        }));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("44", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+            },
+            second =>
+            {
+                Assert.Equal("16", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+            },
+            third =>
+            {
+                Assert.Equal("Ø120", third.Text);
+                Assert.Equal(3, third.BalloonNumber);
+            },
+            fourth =>
+            {
+                Assert.Equal("75", fourth.Text);
+                Assert.Equal(4, fourth.BalloonNumber);
+            },
+            fifth =>
+            {
+                Assert.Equal("R5", fifth.Text);
+                Assert.Equal(5, fifth.BalloonNumber);
+            },
+            sixth =>
+            {
+                Assert.Equal("4xM8", sixth.Text);
+                Assert.Equal(6, sixth.BalloonNumber);
+            });
+    }
+
+    [Fact]
+    public void Detect_CombinesSplitSameLineOcrTokensIntoDimensionCandidates()
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(new[]
+        {
+            new ImageTextWord("Ø", Left: 100, Top: 100, Right: 120, Bottom: 122),
+            new ImageTextWord("16", Left: 124, Top: 101, Right: 150, Bottom: 123),
+            new ImageTextWord("R", Left: 300, Top: 100, Right: 315, Bottom: 122),
+            new ImageTextWord("5", Left: 319, Top: 101, Right: 332, Bottom: 123),
+            new ImageTextWord("DIA.", Left: 100, Top: 200, Right: 150, Bottom: 222),
+            new ImageTextWord("8", Left: 160, Top: 201, Right: 173, Bottom: 223),
+            new ImageTextWord("REV", Left: 200, Top: 200, Right: 245, Bottom: 222)
+        }));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first => Assert.Equal("Ø16", first.Text),
+            second => Assert.Equal("R5", second.Text),
+            third => Assert.Equal("DIA. 8", third.Text));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(tempDirectory))

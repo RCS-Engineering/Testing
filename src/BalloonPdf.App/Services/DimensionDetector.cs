@@ -10,7 +10,7 @@ public sealed class DimensionDetector
     private const double DetailsBoxMaximumCenterYRatio = 0.25d;
 
     private static readonly Regex DimensionRegex = new(
-        @"^(?:(?:[Ø⌀]|%%c|dia\.?|diam\.?|r)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)|(?:\.\d+|\d+\.\d+|\d+\s*/\s*\d+)|\d+(?:\.\d+)?\s*(?:°|deg|degrees)|(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(?:±|\+/-)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+))$",
+        @"^(?:(?:[Ø⌀]|%%c|dia\.?|diam\.?|r)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)|(?:\d+\s*x\s*)?m\s*\d+|(?:\.\d+|\d+\.\d+|\d+\s*/\s*\d+)|\d+(?:\.\d+)?\s*(?:°|deg|degrees)|(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(?:±|\+/-)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+))$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private readonly ImageDimensionDetector imageDimensionDetector;
