@@ -17,6 +17,13 @@ public sealed record ImageTextWord(string Text, int Left, int Top, int Right, in
 
 public sealed class TesseractImageTextExtractor : IImageTextExtractor
 {
+    internal const string LanguageCode = "eng";
+    internal const string ExpectedLanguageDataFileName = LanguageCode + ".traineddata";
+    internal const string TessdataDownloadUrl = "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata";
+
+    private const string TessdataEnvironmentVariableName = "TESSDATA_PREFIX";
+    private const string AppLocalTessdataDirectoryName = "tessdata";
+
     public IReadOnlyList<ImageTextWord> ExtractWords(string imagePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(imagePath);
@@ -26,7 +33,7 @@ public sealed class TesseractImageTextExtractor : IImageTextExtractor
         }
 
         var tessdataPath = ResolveTessdataPath();
-        using var engine = new TesseractEngine(tessdataPath, "eng", EngineMode.Default);
+        using var engine = new TesseractEngine(tessdataPath, LanguageCode, EngineMode.Default);
         using var image = Pix.LoadFromFile(imagePath);
         using var page = engine.Process(image);
         using var iterator = page.GetIterator();
@@ -50,21 +57,42 @@ public sealed class TesseractImageTextExtractor : IImageTextExtractor
 
     private static string ResolveTessdataPath()
     {
-        var candidates = new[]
+        return ResolveTessdataPath(new[]
         {
-            Environment.GetEnvironmentVariable("TESSDATA_PREFIX"),
-            Path.Combine(AppContext.BaseDirectory, "tessdata")
-        };
+            Environment.GetEnvironmentVariable(TessdataEnvironmentVariableName),
+            Path.Combine(AppContext.BaseDirectory, AppLocalTessdataDirectoryName)
+        });
+    }
 
-        foreach (var candidate in candidates.Where(candidate => !string.IsNullOrWhiteSpace(candidate)))
+    internal static string ResolveTessdataPath(IEnumerable<string?> candidates)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        var checkedPaths = candidates
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Select(candidate => Path.GetFullPath(candidate!))
+            .ToArray();
+
+        foreach (var checkedPath in checkedPaths)
         {
-            var fullPath = Path.GetFullPath(candidate!);
-            if (File.Exists(Path.Combine(fullPath, "eng.traineddata")))
+            if (File.Exists(Path.Combine(checkedPath, ExpectedLanguageDataFileName)))
             {
-                return fullPath;
+                return checkedPath;
             }
         }
 
-        throw new InvalidOperationException("Tesseract English OCR data was not found. Add eng.traineddata to a tessdata folder beside the app, or set TESSDATA_PREFIX to the tessdata folder.");
+        throw new InvalidOperationException(BuildMissingLanguageDataMessage(checkedPaths));
+    }
+
+    private static string BuildMissingLanguageDataMessage(IReadOnlyList<string> checkedPaths)
+    {
+        var checkedDirectories = checkedPaths.Count == 0
+            ? "  (no tessdata directories were checked)"
+            : string.Join(Environment.NewLine, checkedPaths.Select(path => $"  - {path}"));
+
+        return $"Tesseract English OCR language data file '{ExpectedLanguageDataFileName}' was not found.{Environment.NewLine}" +
+            $"Checked directories:{Environment.NewLine}{checkedDirectories}{Environment.NewLine}" +
+            $"To enable OCR, create an '{AppLocalTessdataDirectoryName}' folder beside the built or published app executable and place '{ExpectedLanguageDataFileName}' in that folder, or set {TessdataEnvironmentVariableName} to the directory that contains '{ExpectedLanguageDataFileName}'.{Environment.NewLine}" +
+            $"Download the official Tesseract English language data from: {TessdataDownloadUrl}";
     }
 }
