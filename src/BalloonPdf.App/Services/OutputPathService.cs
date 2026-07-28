@@ -8,14 +8,7 @@ public sealed class OutputPathService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(inputPdfPath);
 
-        var inputFullPath = Path.GetFullPath(inputPdfPath);
-        var extension = Path.GetExtension(inputFullPath);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".pdf";
-        }
-
-        return GetDefaultPath(inputFullPath, extension);
+        return GetDefaultPath(Path.GetFullPath(inputPdfPath), ".pdf");
     }
 
     public string GetDefaultExcelOutputPath(string inputPdfPath)

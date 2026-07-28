@@ -25,6 +25,18 @@ public sealed class OutputPathServiceTests : IDisposable
         Assert.NotEqual(Path.GetFullPath(input), Path.GetFullPath(output), StringComparer.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("part.jpg")]
+    [InlineData("part.jpeg")]
+    public void GetDefaultOutputPath_UsesPdfExtensionForJpegInputs(string fileName)
+    {
+        var input = Path.Combine(tempDirectory, fileName);
+
+        var output = service.GetDefaultOutputPath(input);
+
+        Assert.Equal(Path.Combine(tempDirectory, "part_balloons.pdf"), output);
+    }
+
     [Fact]
     public void GetDefaultOutputPath_IncrementsWhenDefaultAlreadyExists()
     {

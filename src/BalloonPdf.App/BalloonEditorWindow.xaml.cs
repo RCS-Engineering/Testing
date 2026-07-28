@@ -8,17 +8,17 @@ namespace BalloonPdf.App;
 public sealed partial class BalloonEditorWindow : Window
 {
     private readonly BalloonAnnotationService annotationService = new();
-    private readonly string previewPdfPath;
+    private readonly string previewInputPath;
     private List<BalloonAnnotation> annotations;
     private bool isAdding;
     private bool isRefreshingSelection;
 
-    public BalloonEditorWindow(string previewPdfPath, IReadOnlyCollection<BalloonAnnotation> annotations)
+    public BalloonEditorWindow(string previewInputPath, IReadOnlyCollection<BalloonAnnotation> annotations)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(previewPdfPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(previewInputPath);
         ArgumentNullException.ThrowIfNull(annotations);
 
-        this.previewPdfPath = previewPdfPath;
+        this.previewInputPath = previewInputPath;
         this.annotations = annotations.Select(annotation => annotation with { }).ToList();
         SavedAnnotations = this.annotations;
 
@@ -36,7 +36,7 @@ public sealed partial class BalloonEditorWindow : Window
     {
         annotations = annotationService.GetOrdered(annotations).ToList();
         AnnotationListBox.ItemsSource = annotations;
-        Preview.LoadPdf(previewPdfPath, annotations);
+        Preview.LoadDocument(previewInputPath, annotations);
         UpdatePageStatus();
 
         if (selectedId is not null)
