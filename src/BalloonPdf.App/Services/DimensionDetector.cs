@@ -12,13 +12,19 @@ public sealed class DimensionDetector
 {
     private const double DetailsBoxMinimumCenterXRatio = 0.72d;
     private const double DetailsBoxMaximumCenterYRatio = 0.25d;
+    private const double BorderExclusionRatio = 0.04d;
+    private const double BottomWatermarkBandMaximumCenterYRatio = 0.12d;
     private const int SparsePdfPageDimensionThreshold = 1;
     private const double OcrFallbackRenderScale = 2d;
     private const int OcrFallbackMaximumPixelSide = 2400;
 
     private static readonly Regex DimensionRegex = new(
-        @"^(?:(?:[Ø⌀]|%%c|dia\.?|diam\.?|r)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)|(?:\d+\s*x\s*)?m\s*\d+|(?:\.\d+|\d+\.\d+|\d+\s*/\s*\d+)|\d+(?:\.\d+)?\s*(?:°|deg|degrees)|(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(?:±|\+/-)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+))$",
+        @"^(?:(?:Ø|%%c|dia\.?|diam\.?|r)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)|(?:\d+\s*x\s*)?m\s*\d+|(?:\.\d+|\d+\.\d+|\d+\s*/\s*\d+)|\d+(?:\.\d+)?\s*(?:°|deg|degrees)|(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(?:±|\+/-)\s*(?:\.\d+|\d+(?:\.\d+)?|\d+\s*/\s*\d+))$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    private static readonly Regex LeadingOcrDiameterRegex = new(
+        @"^[oO](\s*)(?=(?:\.\d+|\d))",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex WholeNumberRegex = new(@"^\d+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly ImageDimensionDetector imageDimensionDetector;
 
@@ -91,19 +97,20 @@ public sealed class DimensionDetector
             var word = words[i];
             if (i + 1 < words.Count && TryCombineTolerance(word, words[i + 1], out var combined) && IsLikelyDimension(combined.Text))
             {
-                if (!IsInBottomRightDetailsBox(combined.Left, combined.Bottom, combined.Right, combined.Top, pageWidth, pageHeight))
+                var combinedCandidate = combined.ToDimensionCandidate();
+                if (IsInAllowedDrawingTextArea(combinedCandidate, pageWidth, pageHeight))
                 {
-                    candidates.Add(combined.ToDimensionCandidate());
+                    candidates.Add(combinedCandidate);
                 }
 
                 i++;
                 continue;
             }
 
-            if (IsLikelyDimension(word.Text)
-                && !IsInBottomRightDetailsBox(word.Left, word.Bottom, word.Right, word.Top, pageWidth, pageHeight))
+            var candidate = word.ToDimensionCandidate();
+            if (IsLikelyPdfVectorDimension(candidate, pageWidth, pageHeight))
             {
-                candidates.Add(word.ToDimensionCandidate());
+                candidates.Add(candidate);
             }
         }
 
@@ -202,8 +209,18 @@ public sealed class DimensionDetector
 
     internal static bool IsLikelyDimension(string text)
     {
-        var normalized = Normalize(text);
+        var normalized = NormalizeDimensionText(text);
         return normalized.Length > 0 && DimensionRegex.IsMatch(normalized);
+    }
+
+    internal static string NormalizeDimensionText(string text)
+    {
+        var normalized = text.Trim()
+            .Replace("−", "-", StringComparison.Ordinal)
+            .Replace("–", "-", StringComparison.Ordinal)
+            .Replace("⌀", "Ø", StringComparison.Ordinal);
+
+        return LeadingOcrDiameterRegex.Replace(normalized, "Ø$1", count: 1);
     }
 
     internal static IReadOnlyList<DimensionCandidate> AssignReadingOrder(IEnumerable<DimensionCandidate> candidates)
@@ -235,6 +252,43 @@ public sealed class DimensionDetector
             && centerY <= pageHeight * DetailsBoxMaximumCenterYRatio;
     }
 
+    internal static bool IsLikelyStandaloneDrawingAreaIntegerDimension(DimensionCandidate candidate, double pageWidth, double pageHeight)
+    {
+        return WholeNumberRegex.IsMatch(candidate.Text.Trim())
+            && IsInAllowedDrawingTextArea(candidate, pageWidth, pageHeight)
+            && !IsInBorderOrGridArea(candidate, pageWidth, pageHeight)
+            && !IsInBottomWatermarkBand(candidate, pageHeight);
+    }
+
+    private static bool IsLikelyPdfVectorDimension(DimensionCandidate candidate, double pageWidth, double pageHeight)
+    {
+        return (IsLikelyDimension(candidate.Text) && IsInAllowedDrawingTextArea(candidate, pageWidth, pageHeight))
+            || IsLikelyStandaloneDrawingAreaIntegerDimension(candidate, pageWidth, pageHeight);
+    }
+
+    private static bool IsInAllowedDrawingTextArea(DimensionCandidate candidate, double pageWidth, double pageHeight)
+    {
+        return !IsInBottomRightDetailsBox(candidate.Left, candidate.Bottom, candidate.Right, candidate.Top, pageWidth, pageHeight);
+    }
+
+    private static bool IsInBorderOrGridArea(DimensionCandidate candidate, double pageWidth, double pageHeight)
+    {
+        if (pageWidth <= 0d || pageHeight <= 0d)
+        {
+            return false;
+        }
+
+        return candidate.CenterX <= pageWidth * BorderExclusionRatio
+            || candidate.CenterX >= pageWidth * (1d - BorderExclusionRatio)
+            || candidate.CenterY <= pageHeight * BorderExclusionRatio
+            || candidate.CenterY >= pageHeight * (1d - BorderExclusionRatio);
+    }
+
+    private static bool IsInBottomWatermarkBand(DimensionCandidate candidate, double pageHeight)
+    {
+        return pageHeight > 0d && candidate.CenterY <= pageHeight * BottomWatermarkBandMaximumCenterYRatio;
+    }
+
     private static bool TryCombineTolerance(WordCandidate first, WordCandidate second, out WordCandidate combined)
     {
         combined = default;
@@ -245,7 +299,8 @@ public sealed class DimensionDetector
 
         var sameLine = Math.Abs(first.CenterY - second.CenterY) <= Math.Max(first.Height, second.Height) * 0.75d;
         var closeEnough = second.Left >= first.Right && second.Left - first.Right <= Math.Max(first.Height, second.Height) * 2d;
-        var secondLooksLikeTolerance = Normalize(second.Text).StartsWith('±') || Normalize(second.Text).StartsWith("+/-", StringComparison.Ordinal);
+        var normalizedSecond = NormalizeDimensionText(second.Text);
+        var secondLooksLikeTolerance = normalizedSecond.StartsWith('±') || normalizedSecond.StartsWith("+/-", StringComparison.Ordinal);
 
         if (!sameLine || !closeEnough || !secondLooksLikeTolerance)
         {
@@ -262,20 +317,12 @@ public sealed class DimensionDetector
         return true;
     }
 
-    private static string Normalize(string text)
-    {
-        return text.Trim()
-            .Replace("−", "-", StringComparison.Ordinal)
-            .Replace("–", "-", StringComparison.Ordinal)
-            .Replace("⌀", "Ø", StringComparison.Ordinal);
-    }
-
     private readonly record struct WordCandidate(int PageNumber, string Text, double Left, double Bottom, double Right, double Top)
     {
         public double Height => Top - Bottom;
 
         public double CenterY => Bottom + (Height / 2d);
 
-        public DimensionCandidate ToDimensionCandidate() => new(PageNumber, Normalize(Text), Left, Bottom, Right, Top, 0);
+        public DimensionCandidate ToDimensionCandidate() => new(PageNumber, NormalizeDimensionText(Text), Left, Bottom, Right, Top, 0);
     }
 }

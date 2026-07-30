@@ -6,12 +6,8 @@ namespace BalloonPdf.App.Services;
 
 public sealed class ImageDimensionDetector
 {
-    private const double BorderExclusionRatio = 0.04d;
-    private const double BottomWatermarkBandMaximumCenterYRatio = 0.12d;
-
-    private static readonly Regex WholeNumberRegex = new(@"^\d+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex TolerancePrefixRegex = new(@"^(?:±|\+/-)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly Regex SplitPrefixRegex = new(@"^(?:[Ø⌀]|%%c|r|m)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    private static readonly Regex SplitPrefixRegex = new(@"^(?:[Ø⌀o]|%%c|r|m)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
     private static readonly Regex ThreadCountPrefixRegex = new(@"^\d+\s*x$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private readonly IImageTextExtractor textExtractor;
@@ -69,7 +65,7 @@ public sealed class ImageDimensionDetector
         {
             if (DimensionDetector.IsLikelyDimension(word.Text) && IsInAllowedImageTextArea(word, pageWidth, pageHeight))
             {
-                AddIfNew(candidates, word);
+                AddIfNew(candidates, word with { Text = DimensionDetector.NormalizeDimensionText(word.Text) });
             }
         }
 
@@ -87,7 +83,7 @@ public sealed class ImageDimensionDetector
                         continue;
                     }
 
-                    var combined = Combine(current, next, combinedText);
+                    var combined = Combine(current, next, DimensionDetector.NormalizeDimensionText(combinedText));
                     if (IsInAllowedImageTextArea(combined, pageWidth, pageHeight))
                     {
                         AddIfNew(candidates, combined);
@@ -156,33 +152,12 @@ public sealed class ImageDimensionDetector
 
     private static bool IsLikelyStandaloneImageIntegerDimension(DimensionCandidate candidate, double pageWidth, double pageHeight)
     {
-        return WholeNumberRegex.IsMatch(candidate.Text.Trim())
-            && IsInAllowedImageTextArea(candidate, pageWidth, pageHeight)
-            && !IsInBorderOrGridArea(candidate, pageWidth, pageHeight)
-            && !IsInBottomWatermarkBand(candidate, pageHeight);
+        return DimensionDetector.IsLikelyStandaloneDrawingAreaIntegerDimension(candidate, pageWidth, pageHeight);
     }
 
     private static bool IsInAllowedImageTextArea(DimensionCandidate candidate, double pageWidth, double pageHeight)
     {
         return !DimensionDetector.IsInBottomRightDetailsBox(candidate.Left, candidate.Bottom, candidate.Right, candidate.Top, pageWidth, pageHeight);
-    }
-
-    private static bool IsInBorderOrGridArea(DimensionCandidate candidate, double pageWidth, double pageHeight)
-    {
-        if (pageWidth <= 0d || pageHeight <= 0d)
-        {
-            return false;
-        }
-
-        return candidate.CenterX <= pageWidth * BorderExclusionRatio
-            || candidate.CenterX >= pageWidth * (1d - BorderExclusionRatio)
-            || candidate.CenterY <= pageHeight * BorderExclusionRatio
-            || candidate.CenterY >= pageHeight * (1d - BorderExclusionRatio);
-    }
-
-    private static bool IsInBottomWatermarkBand(DimensionCandidate candidate, double pageHeight)
-    {
-        return pageHeight > 0d && candidate.CenterY <= pageHeight * BottomWatermarkBandMaximumCenterYRatio;
     }
 
     private static bool IsSameLineNearby(DimensionCandidate first, DimensionCandidate second)

@@ -92,6 +92,7 @@ public sealed class ImageDimensionDetectorTests : IDisposable
             new ImageTextWord("44", Left: 100, Top: 100, Right: 125, Bottom: 120),
             new ImageTextWord("16", Left: 260, Top: 120, Right: 285, Bottom: 140),
             new ImageTextWord("Ø120", Left: 500, Top: 140, Right: 555, Bottom: 160),
+            new ImageTextWord("44", Left: 180, Top: 180, Right: 205, Bottom: 200),
             new ImageTextWord("75", Left: 100, Top: 250, Right: 125, Bottom: 270),
             new ImageTextWord("R5", Left: 400, Top: 260, Right: 425, Bottom: 280),
             new ImageTextWord("4xM8", Left: 600, Top: 420, Right: 650, Bottom: 440),
@@ -124,19 +125,45 @@ public sealed class ImageDimensionDetectorTests : IDisposable
             },
             fourth =>
             {
-                Assert.Equal("75", fourth.Text);
+                Assert.Equal("44", fourth.Text);
                 Assert.Equal(4, fourth.BalloonNumber);
             },
             fifth =>
             {
-                Assert.Equal("R5", fifth.Text);
+                Assert.Equal("75", fifth.Text);
                 Assert.Equal(5, fifth.BalloonNumber);
             },
             sixth =>
             {
-                Assert.Equal("4xM8", sixth.Text);
+                Assert.Equal("R5", sixth.Text);
                 Assert.Equal(6, sixth.BalloonNumber);
+            },
+            seventh =>
+            {
+                Assert.Equal("4xM8", seventh.Text);
+                Assert.Equal(7, seventh.BalloonNumber);
             });
+    }
+
+    [Fact]
+    public void Detect_NormalizesSingleAndSplitOcrDiameterVariants()
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(new[]
+        {
+            new ImageTextWord("o15", Left: 100, Top: 100, Right: 140, Bottom: 122),
+            new ImageTextWord("o", Left: 300, Top: 100, Right: 315, Bottom: 122),
+            new ImageTextWord("15", Left: 319, Top: 101, Right: 345, Bottom: 123),
+            new ImageTextWord("O", Left: 500, Top: 100, Right: 515, Bottom: 122),
+            new ImageTextWord("18", Left: 519, Top: 101, Right: 545, Bottom: 123)
+        }));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first => Assert.Equal("Ø15", first.Text),
+            second => Assert.Equal("Ø15", second.Text),
+            third => Assert.Equal("Ø18", third.Text));
     }
 
     [Fact]
