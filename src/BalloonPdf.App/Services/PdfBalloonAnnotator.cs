@@ -116,6 +116,7 @@ public sealed class PdfBalloonAnnotator
             var strokeColor = ParseColor(annotation.StrokeColorHex);
             var pen = new XPen(strokeColor, StrokeWidth);
 
+            DrawBalloonArrow(graphics, pen, annotation, center, radius, pageHeight);
             graphics.DrawEllipse(pen, brush, bounds);
             DrawBalloonNumber(graphics, pen, bounds, annotation.BalloonNumber);
         }
@@ -142,6 +143,56 @@ public sealed class PdfBalloonAnnotator
         var x = Math.Clamp(desiredX, MinimumMargin, pageWidth - MinimumMargin);
         var y = Math.Clamp(desiredY, MinimumMargin, pageHeight - MinimumMargin);
         return new XPoint(x, y);
+    }
+
+    private static void DrawBalloonArrow(
+        XGraphics graphics,
+        XPen pen,
+        BalloonAnnotation annotation,
+        XPoint center,
+        double radius,
+        double pageHeight)
+    {
+        if (annotation.TargetX is not { } targetX || annotation.TargetY is not { } targetY)
+        {
+            return;
+        }
+
+        var target = new XPoint(targetX, pageHeight - targetY);
+        var deltaX = target.X - center.X;
+        var deltaY = target.Y - center.Y;
+        var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        if (distance <= radius || distance <= double.Epsilon)
+        {
+            return;
+        }
+
+        var unitX = deltaX / distance;
+        var unitY = deltaY / distance;
+        var start = new XPoint(center.X + (unitX * radius), center.Y + (unitY * radius));
+        graphics.DrawLine(pen, start, target);
+
+        const double arrowHeadLength = 6d;
+        const double arrowHeadAngle = Math.PI / 6d;
+        DrawArrowHeadLine(graphics, pen, target, unitX, unitY, arrowHeadLength, arrowHeadAngle);
+        DrawArrowHeadLine(graphics, pen, target, unitX, unitY, arrowHeadLength, -arrowHeadAngle);
+    }
+
+    private static void DrawArrowHeadLine(
+        XGraphics graphics,
+        XPen pen,
+        XPoint target,
+        double unitX,
+        double unitY,
+        double length,
+        double angle)
+    {
+        var cos = Math.Cos(angle);
+        var sin = Math.Sin(angle);
+        var x = (unitX * cos) - (unitY * sin);
+        var y = (unitX * sin) + (unitY * cos);
+        var end = new XPoint(target.X - (x * length), target.Y - (y * length));
+        graphics.DrawLine(pen, target, end);
     }
 
     private static void DrawBalloonNumber(XGraphics graphics, XPen pen, XRect bounds, int balloonNumber)

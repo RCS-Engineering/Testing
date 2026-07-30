@@ -101,21 +101,39 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
     }
 
     [Fact]
-    public void AddBalloons_RasterizesBalloonNumberAsDenseFilledGlyphs()
+    public void AddBalloons_RasterizesBalloonNumberAsDenseFilledBlueGlyphs()
     {
         var inputPath = CreateBlankPdf("input-for-rasterized-number.pdf");
         var outputPath = Path.Combine(tempDirectory, "output-with-rasterized-number.pdf");
         var annotations = new[]
         {
-            BalloonAnnotation.Create(1, centerX: 100, centerY: 100, balloonNumber: 88, strokeColorHex: "#000000")
+            BalloonAnnotation.Create(1, centerX: 100, centerY: 100, balloonNumber: 88)
         };
 
         annotator.AddBalloons(inputPath, outputPath, annotations);
 
         var preview = new PdfPagePreviewRenderer().RenderPage(outputPath, pageNumber: 1, pixelWidth: 400, pixelHeight: 400);
-        var darkPixels = CountDarkPixels(preview, left: 185, top: 188, width: 30, height: 24);
+        var bluePixels = CountBluePixels(preview, left: 185, top: 188, width: 30, height: 24);
 
-        Assert.True(darkPixels >= 85, $"Expected a dense filled digit footprint, but found only {darkPixels} dark pixels.");
+        Assert.True(bluePixels >= 85, $"Expected a dense filled blue digit footprint, but found only {bluePixels} blue pixels.");
+    }
+
+    [Fact]
+    public void AddBalloons_FromDimensionsDrawsBlueAssociationArrow()
+    {
+        var inputPath = CreateBlankPdf("input-for-arrow.pdf");
+        var outputPath = Path.Combine(tempDirectory, "output-with-arrow.pdf");
+        var dimensions = new[]
+        {
+            new DimensionCandidate(1, "1.250", 20, 90, 70, 110, 7)
+        };
+
+        annotator.AddBalloons(inputPath, outputPath, dimensions);
+
+        var preview = new PdfPagePreviewRenderer().RenderPage(outputPath, pageNumber: 1, pixelWidth: 400, pixelHeight: 400);
+        var arrowPixels = CountBluePixels(preview, left: 138, top: 194, width: 28, height: 14);
+
+        Assert.True(arrowPixels >= 12, $"Expected blue pixels along the association arrow path, but found only {arrowPixels}.");
     }
 
     public void Dispose()
@@ -126,7 +144,7 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         }
     }
 
-    private static int CountDarkPixels(PdfPagePreviewImage preview, int left, int top, int width, int height)
+    private static int CountBluePixels(PdfPagePreviewImage preview, int left, int top, int width, int height)
     {
         var count = 0;
         var right = Math.Min(preview.PixelWidth, left + width);
@@ -140,7 +158,7 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
                 var green = preview.Pixels[offset + 1];
                 var red = preview.Pixels[offset + 2];
                 var alpha = preview.Pixels[offset + 3];
-                if (alpha > 0 && red < 80 && green < 80 && blue < 80)
+                if (alpha > 0 && blue > 120 && blue > red + 40 && blue > green + 40)
                 {
                     count++;
                 }
