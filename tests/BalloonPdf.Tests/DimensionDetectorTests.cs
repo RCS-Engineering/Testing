@@ -1,3 +1,4 @@
+using System.Text;
 using BalloonPdf.App.Services;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
@@ -20,6 +21,9 @@ public sealed class DimensionDetectorTests : IDisposable
         "12.50",
         "Ø10",
         "⌀10",
+        "o15",
+        "O15",
+        "o 15",
         "R5",
         "45°",
         "45 deg",
@@ -106,6 +110,80 @@ public sealed class DimensionDetectorTests : IDisposable
     }
 
     [Fact]
+    public void DetectPdfPageVectorCandidates_AcceptsDrawingAreaWholeNumbersAndNormalizesOcrDiameterText()
+    {
+        var pdfPath = CreateVectorTextPdf(
+            "vector-dimensions.pdf",
+            width: 600,
+            height: 400,
+            new[]
+            {
+                TextAt("30", 80, 60),
+                TextAt("9", 160, 70),
+                TextAt("75", 240, 85),
+                TextAt("18", 100, 140),
+                TextAt("7", 190, 150),
+                TextAt("9", 300, 160),
+                TextAt("60", 120, 220),
+                TextAt("R15", 250, 240),
+                TextAt("o15", 360, 260),
+                TextAt("4", 8, 80),
+                TextAt("22", 460, 360),
+                TextAt("REV", 480, 330)
+            });
+        var detector = new DimensionDetector(new ImageDimensionDetector(new FakeImageTextExtractor(_ => Array.Empty<ImageTextWord>())));
+
+        var dimensions = detector.Detect(pdfPath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("30", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+            },
+            second =>
+            {
+                Assert.Equal("9", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+            },
+            third =>
+            {
+                Assert.Equal("75", third.Text);
+                Assert.Equal(3, third.BalloonNumber);
+            },
+            fourth =>
+            {
+                Assert.Equal("18", fourth.Text);
+                Assert.Equal(4, fourth.BalloonNumber);
+            },
+            fifth =>
+            {
+                Assert.Equal("7", fifth.Text);
+                Assert.Equal(5, fifth.BalloonNumber);
+            },
+            sixth =>
+            {
+                Assert.Equal("9", sixth.Text);
+                Assert.Equal(6, sixth.BalloonNumber);
+            },
+            seventh =>
+            {
+                Assert.Equal("60", seventh.Text);
+                Assert.Equal(7, seventh.BalloonNumber);
+            },
+            eighth =>
+            {
+                Assert.Equal("R15", eighth.Text);
+                Assert.Equal(8, eighth.BalloonNumber);
+            },
+            ninth =>
+            {
+                Assert.Equal("Ø15", ninth.Text);
+                Assert.Equal(9, ninth.BalloonNumber);
+            });
+    }
+
+    [Fact]
     public void Detect_UsesOcrFallbackWhenPdfPageHasSparseVectorDimensions()
     {
         var pdfPath = CreateBlankPdf("image-backed.pdf", width: 500, height: 400);
@@ -179,6 +257,65 @@ public sealed class DimensionDetectorTests : IDisposable
         return path;
     }
 
+    private string CreateVectorTextPdf(string fileName, int width, int height, IReadOnlyList<PositionedText> labels)
+    {
+        var path = Path.Combine(tempDirectory, fileName);
+        var textCommands = new StringBuilder();
+        foreach (var label in labels)
+        {
+            textCommands.AppendLine($"BT /F1 12 Tf {label.Left:0.###} {height - label.Top:0.###} Td ({EscapePdfText(label.Text)}) Tj ET");
+        }
+
+        WriteSimplePdf(path, width, height, textCommands.ToString());
+        return path;
+    }
+
+    private static void WriteSimplePdf(string path, int width, int height, string contentStream)
+    {
+        var objects = new[]
+        {
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            $"<< /Length {Encoding.ASCII.GetByteCount(contentStream)} >>\nstream\n{contentStream}endstream"
+        };
+
+        using var stream = File.Create(path);
+        WriteAscii(stream, "%PDF-1.4\n");
+        var offsets = new List<long> { 0 };
+        for (var i = 0; i < objects.Length; i++)
+        {
+            offsets.Add(stream.Position);
+            WriteAscii(stream, $"{i + 1} 0 obj\n{objects[i]}\nendobj\n");
+        }
+
+        var xrefOffset = stream.Position;
+        WriteAscii(stream, $"xref\n0 {offsets.Count}\n");
+        WriteAscii(stream, "0000000000 65535 f \n");
+        foreach (var offset in offsets.Skip(1))
+        {
+            WriteAscii(stream, $"{offset:0000000000} 00000 n \n");
+        }
+
+        WriteAscii(stream, $"trailer\n<< /Size {offsets.Count} /Root 1 0 R >>\nstartxref\n{xrefOffset}\n%%EOF\n");
+    }
+
+    private static void WriteAscii(Stream stream, string text)
+    {
+        stream.Write(Encoding.ASCII.GetBytes(text));
+    }
+
+    private static string EscapePdfText(string text)
+    {
+        return text
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("(", "\\(", StringComparison.Ordinal)
+            .Replace(")", "\\)", StringComparison.Ordinal);
+    }
+
+    private static PositionedText TextAt(string text, double left, double top) => new(text, left, top);
+
     private static ImageTextWord ScaleWord(string text, int left, int top, int right, int bottom, int imageWidth, int imageHeight)
     {
         return new ImageTextWord(
@@ -192,6 +329,8 @@ public sealed class DimensionDetectorTests : IDisposable
     private static int ScaleHorizontal(int coordinate, int imageWidth) => (int)Math.Round(coordinate * (imageWidth / 1000d));
 
     private static int ScaleVertical(int coordinate, int imageHeight) => (int)Math.Round(coordinate * (imageHeight / 800d));
+
+    private sealed record PositionedText(string Text, double Left, double Top);
 
     private sealed class FakeImageTextExtractor(Func<string, IReadOnlyList<ImageTextWord>> extractWords) : IImageTextExtractor
     {
