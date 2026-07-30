@@ -8,9 +8,11 @@ public sealed record BalloonAnnotation(
     double CenterY,
     int BalloonNumber,
     string StrokeColorHex,
-    double Radius)
+    double Radius,
+    double? TargetX,
+    double? TargetY)
 {
-    public const string DefaultStrokeColorHex = "#000000";
+    public const string DefaultStrokeColorHex = "#0000FF";
 
     public static BalloonAnnotation Create(
         int pageNumber,
@@ -19,7 +21,9 @@ public sealed record BalloonAnnotation(
         int balloonNumber,
         string? sourceText = null,
         string? strokeColorHex = null,
-        double radius = 10d)
+        double radius = 10d,
+        double? targetX = null,
+        double? targetY = null)
     {
         return new BalloonAnnotation(
             Guid.NewGuid(),
@@ -29,6 +33,8 @@ public sealed record BalloonAnnotation(
             centerY,
             balloonNumber,
             string.IsNullOrWhiteSpace(strokeColorHex) ? DefaultStrokeColorHex : strokeColorHex,
-            radius);
+            radius,
+            targetX,
+            targetY);
     }
 }

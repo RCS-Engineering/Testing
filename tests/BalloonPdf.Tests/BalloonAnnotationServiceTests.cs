@@ -22,9 +22,9 @@ public sealed class BalloonAnnotationServiceTests
 
         Assert.Collection(
             annotations,
-            first => AssertAnnotation(first, pageNumber: 1, sourceText: "Ø.375", balloonNumber: 1, centerX: 90, centerY: 70),
-            second => AssertAnnotation(second, pageNumber: 1, sourceText: "1.250", balloonNumber: 2, centerX: 50, centerY: 30),
-            third => AssertAnnotation(third, pageNumber: 2, sourceText: "45°", balloonNumber: 3, centerX: 55, centerY: 35));
+            first => AssertAnnotation(first, pageNumber: 1, sourceText: "Ø.375", balloonNumber: 1, centerX: 90, centerY: 70, targetX: 70, targetY: 70),
+            second => AssertAnnotation(second, pageNumber: 1, sourceText: "1.250", balloonNumber: 2, centerX: 50, centerY: 30, targetX: 30, targetY: 30),
+            third => AssertAnnotation(third, pageNumber: 2, sourceText: "45°", balloonNumber: 3, centerX: 55, centerY: 35, targetX: 35, targetY: 35));
     }
 
     [Fact]
@@ -65,6 +65,8 @@ public sealed class BalloonAnnotationServiceTests
         Assert.Equal(225.25d, added.CenterY);
         Assert.Equal(4, added.BalloonNumber);
         Assert.Equal(BalloonAnnotation.DefaultStrokeColorHex, added.StrokeColorHex);
+        Assert.Null(added.TargetX);
+        Assert.Null(added.TargetY);
     }
 
     [Fact]
@@ -94,13 +96,18 @@ public sealed class BalloonAnnotationServiceTests
         string sourceText,
         int balloonNumber,
         double centerX,
-        double centerY)
+        double centerY,
+        double targetX,
+        double targetY)
     {
         Assert.Equal(pageNumber, annotation.PageNumber);
         Assert.Equal(sourceText, annotation.SourceText);
         Assert.Equal(balloonNumber, annotation.BalloonNumber);
         Assert.Equal(centerX, annotation.CenterX);
         Assert.Equal(centerY, annotation.CenterY);
-        Assert.Equal(BalloonAnnotation.DefaultStrokeColorHex, annotation.StrokeColorHex);
+        Assert.Equal(targetX, annotation.TargetX);
+        Assert.Equal(targetY, annotation.TargetY);
+        Assert.Equal("#0000FF", annotation.StrokeColorHex);
+        Assert.Equal("#0000FF", BalloonAnnotation.DefaultStrokeColorHex);
     }
 }

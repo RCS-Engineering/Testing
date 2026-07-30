@@ -214,6 +214,8 @@ public sealed partial class PdfPreviewControl : UserControl
         var y = (pageHeight - annotation.CenterY) * currentScale;
         var brush = CreateBrush(annotation.StrokeColorHex);
 
+        AddAnnotationArrow(annotation, pageHeight, x, y, displayRadius, brush);
+
         var ellipse = new Ellipse
         {
             Width = displayRadius * 2d,
@@ -245,6 +247,65 @@ public sealed partial class PdfPreviewControl : UserControl
         Canvas.SetLeft(label, x - displayRadius);
         Canvas.SetTop(label, y - (label.FontSize / 1.3d));
         PageCanvas.Children.Add(label);
+    }
+
+    private void AddAnnotationArrow(
+        BalloonAnnotation annotation,
+        double pageHeight,
+        double centerX,
+        double centerY,
+        double displayRadius,
+        Brush brush)
+    {
+        if (annotation.TargetX is not { } targetX || annotation.TargetY is not { } targetY)
+        {
+            return;
+        }
+
+        var targetDisplayX = targetX * currentScale;
+        var targetDisplayY = (pageHeight - targetY) * currentScale;
+        var deltaX = targetDisplayX - centerX;
+        var deltaY = targetDisplayY - centerY;
+        var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        if (distance <= displayRadius || distance <= double.Epsilon)
+        {
+            return;
+        }
+
+        var unitX = deltaX / distance;
+        var unitY = deltaY / distance;
+        var startX = centerX + (unitX * displayRadius);
+        var startY = centerY + (unitY * displayRadius);
+        AddArrowLine(startX, startY, targetDisplayX, targetDisplayY, brush);
+
+        const double arrowHeadLength = 6d;
+        const double arrowHeadAngle = Math.PI / 6d;
+        AddArrowHeadLine(targetDisplayX, targetDisplayY, unitX, unitY, arrowHeadLength, arrowHeadAngle, brush);
+        AddArrowHeadLine(targetDisplayX, targetDisplayY, unitX, unitY, arrowHeadLength, -arrowHeadAngle, brush);
+    }
+
+    private void AddArrowHeadLine(double targetX, double targetY, double unitX, double unitY, double length, double angle, Brush brush)
+    {
+        var cos = Math.Cos(angle);
+        var sin = Math.Sin(angle);
+        var x = (unitX * cos) - (unitY * sin);
+        var y = (unitX * sin) + (unitY * cos);
+        AddArrowLine(targetX, targetY, targetX - (x * length), targetY - (y * length), brush);
+    }
+
+    private void AddArrowLine(double x1, double y1, double x2, double y2, Brush brush)
+    {
+        var line = new Line
+        {
+            X1 = x1,
+            Y1 = y1,
+            X2 = x2,
+            Y2 = y2,
+            Stroke = brush,
+            StrokeThickness = 1.5d,
+            IsHitTestVisible = false
+        };
+        PageCanvas.Children.Add(line);
     }
 
     private void PageCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -18,7 +18,9 @@ public sealed class BalloonAnnotationService
                 dimension.BalloonNumber,
                 dimension.Text,
                 BalloonAnnotation.DefaultStrokeColorHex,
-                PdfBalloonAnnotator.BalloonRadius))
+                PdfBalloonAnnotator.BalloonRadius,
+                dimension.Right,
+                dimension.CenterY))
             .ToList();
     }
 
