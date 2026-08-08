@@ -146,6 +146,40 @@ public sealed class ImageDimensionDetectorTests : IDisposable
     }
 
     [Fact]
+    public void Detect_AcceptsNearMarginAndLowerStandaloneWholeNumbersFromOcr()
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(new[]
+        {
+            new ImageTextWord("25", Left: 22, Top: 120, Right: 44, Bottom: 142),
+            new ImageTextWord("12", Left: 260, Top: 720, Right: 284, Bottom: 742),
+            new ImageTextWord("15", Left: 500, Top: 735, Right: 524, Bottom: 755),
+            new ImageTextWord("4", Left: 2, Top: 120, Right: 12, Bottom: 142),
+            new ImageTextWord("9", Left: 400, Top: 775, Right: 412, Bottom: 790),
+            new ImageTextWord("33", Left: 760, Top: 690, Right: 784, Bottom: 712)
+        }));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("25", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+            },
+            second =>
+            {
+                Assert.Equal("12", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+            },
+            third =>
+            {
+                Assert.Equal("15", third.Text);
+                Assert.Equal(3, third.BalloonNumber);
+            });
+    }
+
+    [Fact]
     public void Detect_NormalizesSingleAndSplitOcrDiameterVariants()
     {
         var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
