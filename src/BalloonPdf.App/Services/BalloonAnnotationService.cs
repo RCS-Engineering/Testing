@@ -10,12 +10,15 @@ public sealed class BalloonAnnotationService
 
         return dimensions
             .OrderBy(dimension => dimension.PageNumber)
-            .ThenBy(dimension => dimension.BalloonNumber)
-            .Select(dimension => BalloonAnnotation.Create(
+            .ThenBy(dimension => dimension.BalloonNumber <= 0)
+            .ThenBy(dimension => dimension.BalloonNumber > 0 ? dimension.BalloonNumber : int.MaxValue)
+            .ThenByDescending(dimension => dimension.BalloonNumber > 0 ? double.NegativeInfinity : dimension.Top)
+            .ThenBy(dimension => dimension.BalloonNumber > 0 ? double.NegativeInfinity : dimension.Left)
+            .Select((dimension, index) => BalloonAnnotation.Create(
                 dimension.PageNumber,
                 dimension.Right + PdfBalloonAnnotator.BalloonOffsetX,
                 dimension.CenterY,
-                dimension.BalloonNumber,
+                index + 1,
                 dimension.Text,
                 BalloonAnnotation.DefaultStrokeColorHex,
                 PdfBalloonAnnotator.BalloonRadius,
