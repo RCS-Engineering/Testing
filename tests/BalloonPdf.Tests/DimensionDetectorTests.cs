@@ -184,6 +184,44 @@ public sealed class DimensionDetectorTests : IDisposable
     }
 
     [Fact]
+    public void DetectPdfPageVectorCandidates_AcceptsNearMarginAndLowerStandaloneWholeNumbers()
+    {
+        var pdfPath = CreateVectorTextPdf(
+            "standalone-integers-near-drawing-margins.pdf",
+            width: 600,
+            height: 400,
+            new[]
+            {
+                TextAt("25", 12, 120),
+                TextAt("12", 180, 345),
+                TextAt("15", 320, 360),
+                TextAt("4", 1, 120),
+                TextAt("9", 300, 390),
+                TextAt("33", 470, 330)
+            });
+        var detector = new DimensionDetector(new ImageDimensionDetector(new FakeImageTextExtractor(_ => Array.Empty<ImageTextWord>())));
+
+        var dimensions = detector.Detect(pdfPath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("25", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+            },
+            second =>
+            {
+                Assert.Equal("12", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+            },
+            third =>
+            {
+                Assert.Equal("15", third.Text);
+                Assert.Equal(3, third.BalloonNumber);
+            });
+    }
+
+    [Fact]
     public void Detect_UsesOcrFallbackWhenPdfPageHasSparseVectorDimensions()
     {
         var pdfPath = CreateBlankPdf("image-backed.pdf", width: 500, height: 400);

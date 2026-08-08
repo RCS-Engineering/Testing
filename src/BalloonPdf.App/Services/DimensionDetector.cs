@@ -12,8 +12,8 @@ public sealed class DimensionDetector
 {
     private const double DetailsBoxMinimumCenterXRatio = 0.72d;
     private const double DetailsBoxMaximumCenterYRatio = 0.25d;
-    private const double BorderExclusionRatio = 0.04d;
-    private const double BottomWatermarkBandMaximumCenterYRatio = 0.12d;
+    private const double BorderExclusionRatio = 0.02d;
+    private const double BottomWatermarkBandMaximumCenterYRatio = 0.065d;
     private const int SparsePdfPageDimensionThreshold = 1;
     private const double OcrFallbackRenderScale = 2d;
     private const int OcrFallbackMaximumPixelSide = 2400;
