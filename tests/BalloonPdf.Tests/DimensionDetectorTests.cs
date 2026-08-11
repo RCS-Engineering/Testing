@@ -254,18 +254,18 @@ public sealed class DimensionDetectorTests : IDisposable
     }
 
     [Fact]
-    public void DetectPdfPageVectorCandidates_MergesRealisticVerticallyStackedDigitsWithoutShiftingLaterBalloonNumbers()
+    public void DetectPdfPageVectorCandidates_MergesOffsetVertical400WithoutShiftingBalloonNumbers()
     {
         var pdfPath = CreateVectorTextPdf(
-            "realistic-vertical-vector-integer.pdf",
+            "offset-vertical-vector-400.pdf",
             width: 600,
             height: 400,
             new[]
             {
-                TextAt("65", 90, 70),
+                TextAt("500", 90, 70),
                 TextAt("4", 220, 105),
-                TextAt("0", 225, 132),
-                TextAt("0", 218, 159),
+                TextAt("0", 229, 132),
+                TextAt("0", 228, 159),
                 TextAt("82", 300, 205)
             });
         var detector = new DimensionDetector(new ImageDimensionDetector(new FakeImageTextExtractor(_ => Array.Empty<ImageTextWord>())));
@@ -275,7 +275,7 @@ public sealed class DimensionDetectorTests : IDisposable
         Assert.Collection(dimensions,
             first =>
             {
-                Assert.Equal("65", first.Text);
+                Assert.Equal("500", first.Text);
                 Assert.Equal(1, first.BalloonNumber);
             },
             second =>
@@ -289,6 +289,8 @@ public sealed class DimensionDetectorTests : IDisposable
                 Assert.Equal("82", third.Text);
                 Assert.Equal(3, third.BalloonNumber);
             });
+        Assert.Single(dimensions, dimension => dimension.Text == "500");
+        Assert.Single(dimensions, dimension => dimension.Text == "400");
         Assert.DoesNotContain(dimensions, dimension => dimension.Text is "4" or "0");
     }
 
