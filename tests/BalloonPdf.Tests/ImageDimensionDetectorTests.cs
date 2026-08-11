@@ -232,6 +232,45 @@ public sealed class ImageDimensionDetectorTests : IDisposable
     }
 
     [Fact]
+    public void Detect_MergesRealisticVerticallyStackedOcrDigitsWithoutShiftingLaterBalloonNumbers()
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(new[]
+        {
+            new ImageTextWord("65", Left: 120, Top: 100, Right: 150, Bottom: 122),
+            new ImageTextWord("4", Left: 300, Top: 150, Right: 314, Bottom: 170),
+            new ImageTextWord("0", Left: 306, Top: 202, Right: 320, Bottom: 222),
+            new ImageTextWord("0", Left: 297, Top: 254, Right: 311, Bottom: 274),
+            new ImageTextWord("82", Left: 420, Top: 320, Right: 450, Bottom: 342)
+        }));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("65", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+            },
+            second =>
+            {
+                Assert.Equal("400", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+                Assert.Equal(297, second.Left);
+                Assert.Equal(526, second.Bottom);
+                Assert.Equal(320, second.Right);
+                Assert.Equal(650, second.Top);
+                Assert.True(second.Height > second.Width);
+            },
+            third =>
+            {
+                Assert.Equal("82", third.Text);
+                Assert.Equal(3, third.BalloonNumber);
+            });
+        Assert.DoesNotContain(dimensions, dimension => dimension.Text is "4" or "0");
+    }
+
+    [Fact]
     public void Detect_CombinesSplitSameLineOcrTokensIntoDimensionCandidates()
     {
         var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);

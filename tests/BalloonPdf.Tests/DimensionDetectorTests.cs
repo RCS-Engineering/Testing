@@ -254,6 +254,45 @@ public sealed class DimensionDetectorTests : IDisposable
     }
 
     [Fact]
+    public void DetectPdfPageVectorCandidates_MergesRealisticVerticallyStackedDigitsWithoutShiftingLaterBalloonNumbers()
+    {
+        var pdfPath = CreateVectorTextPdf(
+            "realistic-vertical-vector-integer.pdf",
+            width: 600,
+            height: 400,
+            new[]
+            {
+                TextAt("65", 90, 70),
+                TextAt("4", 220, 105),
+                TextAt("0", 225, 132),
+                TextAt("0", 218, 159),
+                TextAt("82", 300, 205)
+            });
+        var detector = new DimensionDetector(new ImageDimensionDetector(new FakeImageTextExtractor(_ => Array.Empty<ImageTextWord>())));
+
+        var dimensions = detector.Detect(pdfPath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("65", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+            },
+            second =>
+            {
+                Assert.Equal("400", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+                Assert.True(second.Height > second.Width);
+            },
+            third =>
+            {
+                Assert.Equal("82", third.Text);
+                Assert.Equal(3, third.BalloonNumber);
+            });
+        Assert.DoesNotContain(dimensions, dimension => dimension.Text is "4" or "0");
+    }
+
+    [Fact]
     public void Detect_UsesOcrFallbackWhenPdfPageHasSparseVectorDimensions()
     {
         var pdfPath = CreateBlankPdf("image-backed.pdf", width: 500, height: 400);
