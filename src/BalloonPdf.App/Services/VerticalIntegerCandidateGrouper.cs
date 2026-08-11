@@ -7,6 +7,7 @@ internal static class VerticalIntegerCandidateGrouper
     private const double MinimumHorizontalOverlapRatio = 0.4d;
     private const double MaximumCenterXDeltaRatio = 0.5d;
     private const double MaximumCenterXDelta = 8d;
+    private const double MaximumPairedWidthCenterXDeltaRatio = 0.75d;
     private const double MaximumVerticalGapRatio = 2.25d;
     private const double MaximumVerticalOverlapRatio = 0.25d;
     private const double MinimumVerticalGap = 4d;
@@ -134,7 +135,10 @@ internal static class VerticalIntegerCandidateGrouper
         }
 
         var centerXDelta = Math.Abs(upper.CenterX - lower.CenterX);
-        var centerXDeltaTolerance = Math.Max(MaximumCenterXDelta, maxHeight * MaximumCenterXDeltaRatio);
+        var pairedWidthTolerance = (upper.Width + lower.Width) * MaximumPairedWidthCenterXDeltaRatio;
+        var centerXDeltaTolerance = Math.Max(
+            Math.Max(MaximumCenterXDelta, maxHeight * MaximumCenterXDeltaRatio),
+            pairedWidthTolerance);
         return horizontalOverlap / minWidth >= MinimumHorizontalOverlapRatio
             || centerXDelta <= centerXDeltaTolerance;
     }
