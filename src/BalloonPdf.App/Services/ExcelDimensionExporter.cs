@@ -9,79 +9,151 @@ namespace BalloonPdf.App.Services;
 
 public sealed class ExcelDimensionExporter
 {
-    public void Export(string outputExcelPath, IReadOnlyCollection<DimensionCandidate> dimensions)
+    public void Export(string templateExcelPath, string outputExcelPath, IReadOnlyCollection<DimensionCandidate> dimensions)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(templateExcelPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputExcelPath);
         ArgumentNullException.ThrowIfNull(dimensions);
 
+        var templateFullPath = Path.GetFullPath(templateExcelPath);
         var outputFullPath = Path.GetFullPath(outputExcelPath);
+        if (templateFullPath.Equals(outputFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The output Excel workbook path must be different from the template path.");
+        }
+
         var outputDirectory = Path.GetDirectoryName(outputFullPath);
         if (!string.IsNullOrWhiteSpace(outputDirectory))
         {
             Directory.CreateDirectory(outputDirectory);
         }
 
-        using var document = SpreadsheetDocument.Create(outputFullPath, SpreadsheetDocumentType.Workbook);
-        var workbookPart = document.AddWorkbookPart();
-        workbookPart.Workbook = new Workbook();
+        File.Copy(templateFullPath, outputFullPath, overwrite: true);
 
-        var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-        var sheetData = new SheetData();
-        worksheetPart.Worksheet = new Worksheet(sheetData);
+        using var document = SpreadsheetDocument.Open(outputFullPath, true);
+        var workbookPart = document.WorkbookPart ?? throw new InvalidOperationException("The Excel template is missing a workbook part.");
+        var worksheetPart = GetFirstWorksheetPart(workbookPart);
+        var sheetData = GetOrCreateSheetData(worksheetPart);
 
-        var sheets = workbookPart.Workbook.AppendChild(new Sheets());
-        sheets.Append(new Sheet
-        {
-            Id = workbookPart.GetIdOfPart(worksheetPart),
-            SheetId = 1,
-            Name = "Dimensions"
-        });
+        SetTextCell(sheetData, "B", 15, "Dimension");
+        SetTextCell(sheetData, "C", 15, "Balloon Number");
 
-        sheetData.Append(CreateTextRow(1, "Dimension", "Balloon Number"));
-
-        var rowIndex = 2U;
+        var rowIndex = 16U;
         foreach (var dimension in dimensions)
         {
-            sheetData.Append(CreateDimensionRow(rowIndex, dimension));
+            SetTextCell(sheetData, "B", rowIndex, dimension.Text);
+            SetNumberCell(sheetData, "C", rowIndex, dimension.BalloonNumber);
             rowIndex++;
         }
 
+        worksheetPart.Worksheet.Save();
         workbookPart.Workbook.Save();
     }
 
-    private static Row CreateTextRow(uint rowIndex, string firstValue, string secondValue)
+    private static WorksheetPart GetFirstWorksheetPart(WorkbookPart workbookPart)
     {
-        var row = new Row { RowIndex = rowIndex };
-        row.Append(CreateTextCell(rowIndex, "A", firstValue));
-        row.Append(CreateTextCell(rowIndex, "B", secondValue));
-        return row;
+        var firstSheet = workbookPart.Workbook.Sheets?.Elements<Sheet>().FirstOrDefault()
+            ?? throw new InvalidOperationException("The Excel template does not contain any worksheets.");
+        var relationshipId = firstSheet.Id?.Value
+            ?? throw new InvalidOperationException("The first worksheet is missing a relationship id.");
+
+        return workbookPart.GetPartById(relationshipId) as WorksheetPart
+            ?? throw new InvalidOperationException("The first workbook sheet does not reference a worksheet.");
     }
 
-    private static Row CreateDimensionRow(uint rowIndex, DimensionCandidate dimension)
+    private static SheetData GetOrCreateSheetData(WorksheetPart worksheetPart)
     {
-        var row = new Row { RowIndex = rowIndex };
-        row.Append(CreateTextCell(rowIndex, "A", dimension.Text));
-        row.Append(CreateNumberCell(rowIndex, "B", dimension.BalloonNumber));
-        return row;
+        return worksheetPart.Worksheet.GetFirstChild<SheetData>()
+            ?? worksheetPart.Worksheet.AppendChild(new SheetData());
     }
 
-    private static Cell CreateTextCell(uint rowIndex, string columnName, string value)
+    private static Row GetOrCreateRow(SheetData sheetData, uint rowIndex)
     {
-        return new Cell
+        var existingRow = sheetData.Elements<Row>().FirstOrDefault(row => row.RowIndex is not null && row.RowIndex.Value == rowIndex);
+        if (existingRow is not null)
         {
-            CellReference = $"{columnName}{rowIndex}",
-            DataType = CellValues.String,
-            CellValue = new CellValue(value)
-        };
+            return existingRow;
+        }
+
+        var newRow = new Row { RowIndex = rowIndex };
+        var nextRow = sheetData.Elements<Row>().FirstOrDefault(row => row.RowIndex is not null && row.RowIndex.Value > rowIndex);
+        if (nextRow is null)
+        {
+            sheetData.Append(newRow);
+        }
+        else
+        {
+            sheetData.InsertBefore(newRow, nextRow);
+        }
+
+        return newRow;
     }
 
-    private static Cell CreateNumberCell(uint rowIndex, string columnName, int value)
+    private static Cell GetOrCreateCell(SheetData sheetData, string columnName, uint rowIndex)
     {
-        return new Cell
+        var row = GetOrCreateRow(sheetData, rowIndex);
+        var cellReference = $"{columnName}{rowIndex}";
+        var existingCell = row.Elements<Cell>().FirstOrDefault(cell => cell.CellReference?.Value == cellReference);
+        if (existingCell is not null)
         {
-            CellReference = $"{columnName}{rowIndex}",
-            DataType = CellValues.Number,
-            CellValue = new CellValue(value.ToString(CultureInfo.InvariantCulture))
-        };
+            return existingCell;
+        }
+
+        var newCell = new Cell { CellReference = cellReference };
+        var columnIndex = GetColumnIndex(columnName);
+        var nextCell = row.Elements<Cell>()
+            .FirstOrDefault(cell => GetColumnIndex(GetColumnName(cell.CellReference?.Value)) > columnIndex);
+        if (nextCell is null)
+        {
+            row.Append(newCell);
+        }
+        else
+        {
+            row.InsertBefore(newCell, nextCell);
+        }
+
+        return newCell;
+    }
+
+    private static void SetTextCell(SheetData sheetData, string columnName, uint rowIndex, string value)
+    {
+        var cell = GetOrCreateCell(sheetData, columnName, rowIndex);
+        cell.CellFormula = null;
+        cell.DataType = CellValues.String;
+        cell.CellValue = new CellValue(value);
+    }
+
+    private static void SetNumberCell(SheetData sheetData, string columnName, uint rowIndex, int value)
+    {
+        var cell = GetOrCreateCell(sheetData, columnName, rowIndex);
+        cell.CellFormula = null;
+        cell.DataType = CellValues.Number;
+        cell.CellValue = new CellValue(value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static string GetColumnName(string? cellReference)
+    {
+        if (string.IsNullOrWhiteSpace(cellReference))
+        {
+            return string.Empty;
+        }
+
+        return new string(cellReference.TakeWhile(char.IsLetter).ToArray());
+    }
+
+    private static int GetColumnIndex(string columnName)
+    {
+        var columnIndex = 0;
+        foreach (var columnLetter in columnName.ToUpperInvariant())
+        {
+            if (columnLetter < 'A' || columnLetter > 'Z')
+            {
+                continue;
+            }
+
+            columnIndex = (columnIndex * 26) + columnLetter - 'A' + 1;
+        }
+
+        return columnIndex;
     }
 }

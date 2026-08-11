@@ -132,6 +132,7 @@ public sealed class ArialFontResolver : IFontResolver
 
         yield return "/usr/share/fonts/truetype/msttcorefonts";
         yield return "/usr/share/fonts/truetype/liberation2";
+        yield return "/usr/share/fonts/truetype/liberation";
         yield return "/usr/share/fonts/truetype/dejavu";
     }
 

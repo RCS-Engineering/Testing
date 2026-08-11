@@ -9,6 +9,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -26,22 +27,26 @@
         <TextBox x:Name="OutputPathTextBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,10" />
         <Button Grid.Row="1" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Save As..." Click="SelectOutput_Click" />
 
-        <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,10" VerticalAlignment="Center" Text="Output Excel" />
-        <TextBox x:Name="ExcelOutputPathTextBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,10" />
-        <Button Grid.Row="2" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Save As..." Click="SelectExcelOutput_Click" />
+        <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,10" VerticalAlignment="Center" Text="Excel Template" />
+        <TextBox x:Name="ExcelTemplatePathTextBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,10" IsReadOnly="True" />
+        <Button Grid.Row="2" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Browse..." Click="SelectExcelTemplate_Click" />
 
-        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal">
+        <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,10" VerticalAlignment="Center" Text="Output Excel" />
+        <TextBox x:Name="ExcelOutputPathTextBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,10" />
+        <Button Grid.Row="3" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Save As..." Click="SelectExcelOutput_Click" />
+
+        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal">
             <Button x:Name="GenerateButton" MinWidth="120" Margin="0,0,8,0" Padding="12,6" Content="Generate" Click="Generate_Click" />
             <Button x:Name="ExpandEditButton" MinWidth="120" Margin="0,0,8,0" Padding="12,6" Content="Expand/Edit" IsEnabled="False" Click="ExpandEdit_Click" />
             <Button x:Name="OpenPdfButton" MinWidth="120" Padding="12,6" Content="Open PDF" IsEnabled="False" Click="OpenPdf_Click" />
         </StackPanel>
 
-        <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,16,0,0" BorderBrush="#FFCCCCCC" BorderThickness="1" Background="White">
+        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,16,0,0" BorderBrush="#FFCCCCCC" BorderThickness="1" Background="White">
             <local:PdfPreviewControl x:Name="InlinePreview" />
         </Border>
 
-        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Padding="10" BorderBrush="#FFCCCCCC" BorderThickness="1">
-            <TextBlock x:Name="StatusTextBlock" TextWrapping="Wrap" Text="Choose a vector-text engineering PDF to begin." />
+        <Border Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Padding="10" BorderBrush="#FFCCCCCC" BorderThickness="1">
+            <TextBlock x:Name="StatusTextBlock" TextWrapping="Wrap" Text="Choose a source drawing and Excel template to begin." />
         </Border>
     </Grid>
 </Window>

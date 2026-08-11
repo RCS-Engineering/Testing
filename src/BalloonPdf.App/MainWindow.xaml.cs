@@ -75,6 +75,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SelectExcelTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Choose Excel template workbook",
+            Filter = "Excel workbooks (*.xlsx)|*.xlsx|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            ExcelTemplatePathTextBox.Text = dialog.FileName;
+            SetStatus("Excel template selected. Choose Generate to create a filled workbook copy.");
+        }
+    }
+
     private void SelectExcelOutput_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new SaveFileDialog
@@ -101,9 +118,10 @@ public partial class MainWindow : Window
     {
         var inputPath = InputPathTextBox.Text.Trim();
         var outputPath = OutputPathTextBox.Text.Trim();
+        var excelTemplatePath = ExcelTemplatePathTextBox.Text.Trim();
         var excelOutputPath = ExcelOutputPathTextBox.Text.Trim();
 
-        if (!ValidatePaths(inputPath, outputPath, excelOutputPath))
+        if (!ValidatePaths(inputPath, outputPath, excelTemplatePath, excelOutputPath))
         {
             return;
         }
@@ -129,8 +147,8 @@ public partial class MainWindow : Window
             SetStatus($"Detected {dimensions.Count} dimensions. Writing ballooned PDF...");
             await Task.Run(() => balloonAnnotator.AddBalloons(inputPath, outputPath, currentAnnotations));
 
-            SetStatus("Writing Excel dimension workbook...");
-            await Task.Run(() => excelExporter.Export(excelOutputPath, dimensions));
+            SetStatus("Writing filled Excel workbook copy...");
+            await Task.Run(() => excelExporter.Export(excelTemplatePath, excelOutputPath, dimensions));
 
             InlinePreview.LoadDocument(inputPath, currentAnnotations);
             ExpandEditButton.IsEnabled = true;
@@ -203,7 +221,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private bool ValidatePaths(string inputPath, string outputPath, string excelOutputPath)
+    private bool ValidatePaths(string inputPath, string outputPath, string excelTemplatePath, string excelOutputPath)
     {
         if (string.IsNullOrWhiteSpace(inputPath))
         {
@@ -235,6 +253,24 @@ public partial class MainWindow : Window
             return false;
         }
 
+        if (string.IsNullOrWhiteSpace(excelTemplatePath))
+        {
+            SetStatus("Choose an Excel template workbook.");
+            return false;
+        }
+
+        if (!File.Exists(excelTemplatePath))
+        {
+            SetStatus("The selected Excel template workbook does not exist.");
+            return false;
+        }
+
+        if (!Path.GetExtension(excelTemplatePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            SetStatus("Choose an .xlsx Excel template workbook.");
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(excelOutputPath))
         {
             SetStatus("Choose an output Excel path.");
@@ -244,6 +280,12 @@ public partial class MainWindow : Window
         if (Path.GetFullPath(inputPath).Equals(Path.GetFullPath(excelOutputPath), StringComparison.OrdinalIgnoreCase))
         {
             SetStatus("The output Excel workbook must be separate from the source drawing.");
+            return false;
+        }
+
+        if (Path.GetFullPath(excelTemplatePath).Equals(Path.GetFullPath(excelOutputPath), StringComparison.OrdinalIgnoreCase))
+        {
+            SetStatus("The output Excel workbook must be separate from the template workbook.");
             return false;
         }
 
