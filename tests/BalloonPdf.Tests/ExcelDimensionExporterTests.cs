@@ -48,6 +48,31 @@ public sealed class ExcelDimensionExporterTests : IDisposable
     }
 
     [Fact]
+    public void Export_WritesOneRowForMergedVerticalIntegerAndDoesNotShiftFollowingDimensions()
+    {
+        var templatePath = Path.Combine(tempDirectory, "template.xlsx");
+        var outputPath = Path.Combine(tempDirectory, "dimensions.xlsx");
+        CreateTemplateWorkbook(templatePath);
+        var dimensions = new[]
+        {
+            new DimensionCandidate(1, "65", 90, 300, 110, 320, 1),
+            new DimensionCandidate(1, "400", 218, 240, 232, 320, 2),
+            new DimensionCandidate(1, "82", 300, 180, 320, 200, 3)
+        };
+
+        exporter.Export(templatePath, outputPath, dimensions);
+
+        Assert.Equal("65", ReadCellValue(outputPath, "B16"));
+        Assert.Equal("1", ReadCellValue(outputPath, "C16"));
+        Assert.Equal("400", ReadCellValue(outputPath, "B17"));
+        Assert.Equal("2", ReadCellValue(outputPath, "C17"));
+        Assert.Equal("82", ReadCellValue(outputPath, "B18"));
+        Assert.Equal("3", ReadCellValue(outputPath, "C18"));
+        Assert.False(CellExists(outputPath, "B19"));
+        Assert.False(CellExists(outputPath, "C19"));
+    }
+
+    [Fact]
     public void Export_UpdatesExistingTargetCellsWithoutDuplicatingCellReferences()
     {
         var templatePath = Path.Combine(tempDirectory, "template.xlsx");
@@ -179,6 +204,16 @@ public sealed class ExcelDimensionExporterTests : IDisposable
         var worksheet = worksheetPart.Worksheet ?? throw new InvalidOperationException("Worksheet is missing worksheet data.");
         return worksheet.Descendants<Cell>()
             .Count(cell => cell.CellReference?.Value == cellReference);
+    }
+
+    private static bool CellExists(string workbookPath, string cellReference)
+    {
+        using var document = SpreadsheetDocument.Open(workbookPath, false);
+        var workbookPart = document.WorkbookPart ?? throw new InvalidOperationException("Workbook is missing a workbook part.");
+        var worksheetPart = GetFirstWorksheetPart(workbookPart);
+        var worksheet = worksheetPart.Worksheet ?? throw new InvalidOperationException("Worksheet is missing worksheet data.");
+        return worksheet.Descendants<Cell>()
+            .Any(cell => cell.CellReference?.Value == cellReference);
     }
 
     private static WorksheetPart GetFirstWorksheetPart(WorkbookPart workbookPart)

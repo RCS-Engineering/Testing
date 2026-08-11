@@ -4,9 +4,10 @@ namespace BalloonPdf.App.Services;
 
 internal static class VerticalIntegerCandidateGrouper
 {
-    private const double MinimumHorizontalOverlapRatio = 0.6d;
-    private const double MaximumCenterXDeltaRatio = 0.35d;
-    private const double MaximumVerticalGapRatio = 1.25d;
+    private const double MinimumHorizontalOverlapRatio = 0.4d;
+    private const double MaximumCenterXDeltaRatio = 0.5d;
+    private const double MaximumCenterXDelta = 8d;
+    private const double MaximumVerticalGapRatio = 2.25d;
     private const double MaximumVerticalOverlapRatio = 0.25d;
     private const double MinimumVerticalGap = 4d;
 
@@ -24,8 +25,8 @@ internal static class VerticalIntegerCandidateGrouper
             .Select((candidate, index) => new IndexedCandidate(index, candidate))
             .Where(candidate => IsSingleDigit(candidate.Candidate))
             .OrderBy(candidate => candidate.Candidate.PageNumber)
-            .ThenBy(candidate => candidate.Candidate.Left)
             .ThenByDescending(candidate => candidate.Candidate.Top)
+            .ThenBy(candidate => candidate.Candidate.Left)
             .ToList();
 
         foreach (var candidate in digitCandidates)
@@ -133,8 +134,9 @@ internal static class VerticalIntegerCandidateGrouper
         }
 
         var centerXDelta = Math.Abs(upper.CenterX - lower.CenterX);
+        var centerXDeltaTolerance = Math.Max(MaximumCenterXDelta, maxHeight * MaximumCenterXDeltaRatio);
         return horizontalOverlap / minWidth >= MinimumHorizontalOverlapRatio
-            || centerXDelta <= minWidth * MaximumCenterXDeltaRatio;
+            || centerXDelta <= centerXDeltaTolerance;
     }
 
     private readonly record struct IndexedCandidate(int Index, DimensionCandidate Candidate);
