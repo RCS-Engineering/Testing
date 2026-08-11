@@ -59,10 +59,18 @@ public sealed class ImageDimensionDetector
         double pageWidth,
         double pageHeight)
     {
-        var candidates = new List<DimensionCandidate>();
+        var verticalIntegerGrouping = VerticalIntegerCandidateGrouper.Build(
+            words,
+            candidate => IsLikelyStandaloneImageIntegerDimension(candidate, pageWidth, pageHeight));
+        var candidates = new List<DimensionCandidate>(verticalIntegerGrouping.MergedCandidates);
 
         foreach (var word in words)
         {
+            if (verticalIntegerGrouping.ContainsSource(word))
+            {
+                continue;
+            }
+
             if (DimensionDetector.IsLikelyDimension(word.Text) && IsInAllowedImageTextArea(word, pageWidth, pageHeight))
             {
                 AddIfNew(candidates, word with { Text = DimensionDetector.NormalizeDimensionText(word.Text) });

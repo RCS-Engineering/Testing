@@ -92,9 +92,20 @@ public sealed class DimensionDetector
             .ThenBy(word => word.Left)
             .ToList();
 
+        var verticalIntegerGrouping = VerticalIntegerCandidateGrouper.Build(
+            words.Select(word => word.ToDimensionCandidate()).ToList(),
+            candidate => IsLikelyStandaloneDrawingAreaIntegerDimension(candidate, pageWidth, pageHeight));
+        candidates.AddRange(verticalIntegerGrouping.MergedCandidates);
+
         for (var i = 0; i < words.Count; i++)
         {
             var word = words[i];
+            var candidate = word.ToDimensionCandidate();
+            if (verticalIntegerGrouping.ContainsSource(candidate))
+            {
+                continue;
+            }
+
             if (i + 1 < words.Count && TryCombineTolerance(word, words[i + 1], out var combined) && IsLikelyDimension(combined.Text))
             {
                 var combinedCandidate = combined.ToDimensionCandidate();
@@ -107,7 +118,6 @@ public sealed class DimensionDetector
                 continue;
             }
 
-            var candidate = word.ToDimensionCandidate();
             if (IsLikelyPdfVectorDimension(candidate, pageWidth, pageHeight))
             {
                 candidates.Add(candidate);

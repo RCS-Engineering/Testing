@@ -201,6 +201,37 @@ public sealed class ImageDimensionDetectorTests : IDisposable
     }
 
     [Fact]
+    public void Detect_MergesVerticallyStackedOcrDigitsIntoOneWholeNumber()
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(new[]
+        {
+            new ImageTextWord("4", Left: 100, Top: 100, Right: 114, Bottom: 120),
+            new ImageTextWord("0", Left: 101, Top: 123, Right: 115, Bottom: 143),
+            new ImageTextWord("0", Left: 100, Top: 146, Right: 114, Bottom: 166),
+            new ImageTextWord("55", Left: 220, Top: 190, Right: 248, Bottom: 212)
+        }));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("400", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+                Assert.Equal(100, first.Left);
+                Assert.Equal(634, first.Bottom);
+                Assert.Equal(115, first.Right);
+                Assert.Equal(700, first.Top);
+            },
+            second =>
+            {
+                Assert.Equal("55", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+            });
+    }
+
+    [Fact]
     public void Detect_CombinesSplitSameLineOcrTokensIntoDimensionCandidates()
     {
         var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
