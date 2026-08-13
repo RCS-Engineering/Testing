@@ -43,14 +43,14 @@ public sealed class ExcelDimensionExporter
         var worksheet = worksheetPart.Worksheet ?? throw new InvalidOperationException("Template worksheet is missing worksheet data.");
         var sheetData = GetOrCreateSheetData(worksheet);
 
-        SetTextCell(sheetData, "B", 15, "Dimension");
-        SetTextCell(sheetData, "C", 15, "Balloon Number");
+        //SetTextCell(sheetData, "B", 15, "Dimension");
+        //SetTextCell(sheetData, "C", 15, "Balloon Number");
 
-        var rowIndex = 16U;
+        var rowIndex = 15U;
         foreach (var dimension in dimensions)
         {
+            SetNumberCell(sheetData, "A", rowIndex, dimension.BalloonNumber);
             SetTextCell(sheetData, "B", rowIndex, dimension.Text);
-            SetNumberCell(sheetData, "C", rowIndex, dimension.BalloonNumber);
             rowIndex++;
         }
 
