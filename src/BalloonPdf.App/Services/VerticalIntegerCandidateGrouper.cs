@@ -4,12 +4,14 @@ namespace BalloonPdf.App.Services;
 
 internal static class VerticalIntegerCandidateGrouper
 {
-    private const double MinimumHorizontalOverlapRatio = 0.4d;
-    private const double MaximumCenterXDeltaRatio = 0.5d;
-    private const double MaximumCenterXDelta = 8d;
-    private const double MaximumPairedWidthCenterXDeltaRatio = 0.75d;
-    private const double MaximumVerticalGapRatio = 2.25d;
-    private const double MaximumVerticalOverlapRatio = 0.25d;
+    private const double MinimumHorizontalOverlapRatio = 0.35d;
+    private const double MaximumCenterXDeltaRatio = 0.75d;
+    private const double MaximumCenterXDelta = 10d;
+    private const double MaximumPairedWidthCenterXDeltaRatio = 1d;
+    private const double MaximumRunAxisCenterXDeltaRatio = 1.25d;
+    private const double MaximumRunAxisCenterXDelta = 12d;
+    private const double MaximumVerticalGapRatio = 4.75d;
+    private const double MaximumVerticalOverlapRatio = 0.5d;
     private const double MinimumVerticalGap = 4d;
 
     public static VerticalIntegerCandidateGroupingResult Build(
@@ -37,7 +39,7 @@ internal static class VerticalIntegerCandidateGrouper
                 continue;
             }
 
-            var run = BuildRun(candidate, digitCandidates, consumedIndexes);
+            var run = BuildAxisRun(candidate, digitCandidates, consumedIndexes);
             if (run.Count < 2)
             {
                 continue;
@@ -60,40 +62,44 @@ internal static class VerticalIntegerCandidateGrouper
         return new VerticalIntegerCandidateGroupingResult(mergedCandidates, consumedCandidates);
     }
 
-    private static List<IndexedCandidate> BuildRun(
+    private static List<IndexedCandidate> BuildAxisRun(
         IndexedCandidate first,
         IReadOnlyList<IndexedCandidate> digitCandidates,
         ISet<int> consumedIndexes)
     {
-        var run = new List<IndexedCandidate> { first };
-        var current = first;
-
-        while (true)
+        var axisCluster = digitCandidates
+            .Where(candidate => candidate.Candidate.PageNumber == first.Candidate.PageNumber
+                && !consumedIndexes.Contains(candidate.Index)
+                && IsAlignedOnVerticalAxis(first.Candidate, candidate.Candidate))
+            .OrderByDescending(candidate => candidate.Candidate.Top)
+            .ThenBy(candidate => candidate.Candidate.Left)
+            .ToList();
+        var firstIndex = axisCluster.FindIndex(candidate => candidate.Index == first.Index);
+        if (firstIndex < 0)
         {
-            var next = digitCandidates
-                .Where(candidate => candidate.Index != current.Index
-                    && !consumedIndexes.Contains(candidate.Index)
-                    && run.All(runCandidate => runCandidate.Index != candidate.Index)
-                    && IsStackedBelow(current.Candidate, candidate.Candidate))
-                .OrderBy(candidate => current.Candidate.Bottom - candidate.Candidate.Top)
-                .ThenBy(candidate => Math.Abs(current.Candidate.CenterX - candidate.Candidate.CenterX))
-                .Select(candidate => (IndexedCandidate?)candidate)
-                .FirstOrDefault();
+            return new List<IndexedCandidate> { first };
+        }
 
-            if (next is null)
+        var run = new List<IndexedCandidate> { first };
+        for (var i = firstIndex + 1; i < axisCluster.Count; i++)
+        {
+            var next = axisCluster[i];
+            if (!IsStackedBelow(run[^1].Candidate, next.Candidate) || !IsAlignedWithRunAxis(run, next.Candidate))
             {
-                return run;
+                break;
             }
 
-            run.Add(next.Value);
-            current = next.Value;
+            run.Add(next);
         }
+
+        return run;
     }
 
     private static DimensionCandidate Merge(IReadOnlyList<IndexedCandidate> run)
     {
         var orderedRun = run
             .OrderByDescending(candidate => candidate.Candidate.Top)
+            .ThenBy(candidate => candidate.Candidate.Left)
             .ToList();
         var text = string.Concat(orderedRun.Select(candidate => candidate.Candidate.Text.Trim()));
         return new DimensionCandidate(
@@ -121,21 +127,38 @@ internal static class VerticalIntegerCandidateGrouper
 
         var maxHeight = Math.Max(upper.Height, lower.Height);
         var verticalGap = upper.Bottom - lower.Top;
-        if (verticalGap < -maxHeight * MaximumVerticalOverlapRatio
-            || verticalGap > Math.Max(MinimumVerticalGap, maxHeight * MaximumVerticalGapRatio))
+        return verticalGap >= -maxHeight * MaximumVerticalOverlapRatio
+            && verticalGap <= Math.Max(MinimumVerticalGap, maxHeight * MaximumVerticalGapRatio);
+    }
+
+    private static bool IsAlignedWithRunAxis(IReadOnlyCollection<IndexedCandidate> run, DimensionCandidate candidate)
+    {
+        var averageCenterX = run.Average(runCandidate => runCandidate.Candidate.CenterX);
+        var averageWidth = run.Average(runCandidate => runCandidate.Candidate.Width);
+        var averageHeight = run.Average(runCandidate => runCandidate.Candidate.Height);
+        var tolerance = Math.Max(
+            MaximumRunAxisCenterXDelta,
+            Math.Max(averageHeight * MaximumCenterXDeltaRatio, averageWidth * MaximumRunAxisCenterXDeltaRatio));
+        return Math.Abs(candidate.CenterX - averageCenterX) <= tolerance;
+    }
+
+    private static bool IsAlignedOnVerticalAxis(DimensionCandidate first, DimensionCandidate second)
+    {
+        if (first.PageNumber != second.PageNumber)
         {
             return false;
         }
 
-        var horizontalOverlap = Math.Min(upper.Right, lower.Right) - Math.Max(upper.Left, lower.Left);
-        var minWidth = Math.Min(upper.Width, lower.Width);
+        var minWidth = Math.Min(first.Width, second.Width);
         if (minWidth <= 0d)
         {
             return false;
         }
 
-        var centerXDelta = Math.Abs(upper.CenterX - lower.CenterX);
-        var pairedWidthTolerance = (upper.Width + lower.Width) * MaximumPairedWidthCenterXDeltaRatio;
+        var horizontalOverlap = Math.Min(first.Right, second.Right) - Math.Max(first.Left, second.Left);
+        var centerXDelta = Math.Abs(first.CenterX - second.CenterX);
+        var maxHeight = Math.Max(first.Height, second.Height);
+        var pairedWidthTolerance = (first.Width + second.Width) * MaximumPairedWidthCenterXDeltaRatio;
         var centerXDeltaTolerance = Math.Max(
             Math.Max(MaximumCenterXDelta, maxHeight * MaximumCenterXDeltaRatio),
             pairedWidthTolerance);

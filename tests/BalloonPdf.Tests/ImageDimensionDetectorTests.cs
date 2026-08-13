@@ -273,6 +273,46 @@ public sealed class ImageDimensionDetectorTests : IDisposable
     }
 
     [Fact]
+    public void Detect_MergesWideSpacedAttachmentLikeVertical420OcrDigits()
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(new[]
+        {
+            new ImageTextWord("500", Left: 120, Top: 100, Right: 160, Bottom: 122),
+            new ImageTextWord("4", Left: 300, Top: 150, Right: 308, Bottom: 170),
+            new ImageTextWord("2", Left: 301, Top: 194, Right: 309, Bottom: 214),
+            new ImageTextWord("0", Left: 300, Top: 238, Right: 308, Bottom: 258),
+            new ImageTextWord("82", Left: 420, Top: 320, Right: 450, Bottom: 342)
+        }));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal("500", first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+            },
+            second =>
+            {
+                Assert.Equal("420", second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+                Assert.Equal(300, second.Left);
+                Assert.Equal(542, second.Bottom);
+                Assert.Equal(309, second.Right);
+                Assert.Equal(650, second.Top);
+                Assert.True(second.Height > second.Width);
+            },
+            third =>
+            {
+                Assert.Equal("82", third.Text);
+                Assert.Equal(3, third.BalloonNumber);
+            });
+        Assert.Single(dimensions, dimension => dimension.Text == "420");
+        Assert.DoesNotContain(dimensions, dimension => dimension.Text is "4" or "2" or "0");
+    }
+
+    [Fact]
     public void Detect_CombinesSplitSameLineOcrTokensIntoDimensionCandidates()
     {
         var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
