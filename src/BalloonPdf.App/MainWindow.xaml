@@ -11,7 +11,7 @@
 
         <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" Padding="28,20">
             <StackPanel>
-                <TextBlock FontSize="28" FontWeight="Bold" Foreground="White" Text="Engineering Drawing Balloon Generator" />
+                <TextBlock FontSize="28" FontWeight="Bold" Foreground="White" Text="Engineering Balloon Generator" />
                 <TextBlock Margin="0,4,0,0" FontSize="15" Foreground="#DDEEFF" Text="Automatically Generates Balloon numbers on Drawings as PDF and Inspection Report as Excel having Dimesions" />
             </StackPanel>
         </Border>
@@ -111,54 +111,30 @@
             HorizontalAlignment="Center">
 
                     <Button x:Name="GenerateButton"
-            MinWidth="128"
-            Margin="0,0,10,0"
-            Click="Generate_Click">
-
-                        <TextBlock Text="Generate"
-                   Foreground="White"
-                   FontWeight="SemiBold"
-                   HorizontalAlignment="Center"/>
-
-                    </Button>
+                            MinWidth="128"
+                            Margin="0,0,10,0"
+                            Content="Generate"
+                            Click="Generate_Click" />
 
                     <Button x:Name="ExpandEditButton"
-            MinWidth="128"
-            Margin="0,0,10,0"
-            IsEnabled="False"
-            Click="ExpandEdit_Click">
-
-                        <TextBlock Text="Expand/Edit"
-                   Foreground="White"
-                   FontWeight="SemiBold"
-                   HorizontalAlignment="Center"/>
-
-                    </Button>
+                            MinWidth="128"
+                            Margin="0,0,10,0"
+                            Content="Expand/Edit"
+                            IsEnabled="False"
+                            Click="ExpandEdit_Click" />
 
                     <Button x:Name="OpenPdfButton"
-            MinWidth="128"
-            Margin="0,0,10,0"
-            IsEnabled="False"
-            Click="OpenPdf_Click">
-
-                        <TextBlock Text="Open PDF"
-                   Foreground="White"
-                   FontWeight="SemiBold"
-                   HorizontalAlignment="Center"/>
-
-                    </Button>
+                            MinWidth="128"
+                            Margin="0,0,10,0"
+                            Content="Open PDF"
+                            IsEnabled="False"
+                            Click="OpenPdf_Click" />
 
                     <Button x:Name="OpenExcelButton"
-            MinWidth="128"
-            IsEnabled="False"
-            Click="OpenExcel_Click">
-
-                        <TextBlock Text="Open Excel"
-                   Foreground="White"
-                   FontWeight="SemiBold"
-                   HorizontalAlignment="Center"/>
-
-                    </Button>
+                            MinWidth="128"
+                            Content="Open Excel"
+                            IsEnabled="False"
+                            Click="OpenExcel_Click" />
 
                 </StackPanel>
             </Border>

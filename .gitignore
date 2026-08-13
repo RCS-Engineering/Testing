@@ -6,4 +6,5 @@ obj/
 TestResults/
 .coverage/
 .dotnet/
+.verify/
 dotnet-install.sh
