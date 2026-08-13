@@ -4,16 +4,22 @@ namespace BalloonPdf.App.Services;
 
 internal static class VerticalIntegerCandidateGrouper
 {
-    private const double MinimumHorizontalOverlapRatio = 0.35d;
-    private const double MaximumCenterXDeltaRatio = 0.75d;
-    private const double MaximumCenterXDelta = 10d;
-    private const double MaximumPairedWidthCenterXDeltaRatio = 1d;
-    private const double MaximumStackedCenterXDeltaToCenterYDeltaRatio = 0.45d;
-    private const double MaximumRunAxisCenterXDeltaRatio = 1.25d;
-    private const double MaximumRunAxisCenterXDelta = 12d;
-    private const double MaximumVerticalGapRatio = 4.75d;
-    private const double MaximumVerticalOverlapRatio = 0.5d;
-    private const double MinimumVerticalGap = 4d;
+    // Same page is always required.
+
+    // Tolerance for determining whether digits are on the same
+    // visual axis.
+    private const double AxisTolerance = 20d;
+
+    // Maximum gap between consecutive digits relative to their size.
+    private const double MaximumGapRatio = 4.0d;
+
+    private const double MinimumGap = 1.0d;
+
+    // Prevent accidentally grouping very distant digits.
+    private const double MaximumAbsoluteGap = 60d;
+
+    // Prevent very large accidental groups.
+    private const int MaximumDigitsInRun = 6;
 
     public static VerticalIntegerCandidateGroupingResult Build(
         IReadOnlyList<DimensionCandidate> wordCandidates,
@@ -26,209 +32,396 @@ internal static class VerticalIntegerCandidateGrouper
         var sourceRuns = new List<VerticalIntegerCandidateSourceRun>();
         var consumedCandidates = new List<DimensionCandidate>();
         var consumedIndexes = new HashSet<int>();
+
         var digitCandidates = wordCandidates
-            .Select((candidate, index) => new IndexedCandidate(index, candidate))
-            .Where(candidate => IsSingleDigit(candidate.Candidate))
-            .OrderBy(candidate => candidate.Candidate.PageNumber)
-            .ThenByDescending(candidate => candidate.Candidate.Top)
-            .ThenBy(candidate => candidate.Candidate.Left)
+            .Select((candidate, index) =>
+                new IndexedCandidate(index, candidate))
+            .Where(x => IsSingleDigit(x.Candidate))
+            .OrderBy(x => x.Candidate.PageNumber)
+            .ThenBy(x => x.Candidate.CenterY)
+            .ThenBy(x => x.Candidate.CenterX)
             .ToList();
 
-        foreach (var candidate in digitCandidates)
+        foreach (var first in digitCandidates)
         {
-            if (consumedIndexes.Contains(candidate.Index))
+            if (consumedIndexes.Contains(first.Index))
             {
                 continue;
             }
 
-            var run = BuildAxisRun(candidate, digitCandidates, consumedIndexes);
+            var run = FindBestRun(
+                first,
+                digitCandidates,
+                consumedIndexes);
+
             if (run.Count < 2)
             {
                 continue;
             }
 
             var merged = Merge(run);
-            if (!IsTallerThanWide(merged) || !isValidMergedCandidate(merged))
+
+            if (!isValidMergedCandidate(merged))
             {
                 continue;
             }
 
             var sourceCandidates = run
-                .OrderByDescending(runCandidate => runCandidate.Candidate.Top)
-                .ThenBy(runCandidate => runCandidate.Candidate.Left)
-                .Select(runCandidate => runCandidate.Candidate)
+                .OrderBy(x => x.Order)
+                .Select(x => x.Candidate)
                 .ToList();
+
             mergedCandidates.Add(merged);
-            sourceRuns.Add(new VerticalIntegerCandidateSourceRun(merged, sourceCandidates));
-            foreach (var runCandidate in run)
+
+            sourceRuns.Add(
+                new VerticalIntegerCandidateSourceRun(
+                    merged,
+                    sourceCandidates));
+
+            foreach (var source in run)
             {
-                consumedIndexes.Add(runCandidate.Index);
-                consumedCandidates.Add(runCandidate.Candidate);
+                consumedIndexes.Add(source.Index);
+                consumedCandidates.Add(source.Candidate);
             }
         }
 
-        return new VerticalIntegerCandidateGroupingResult(mergedCandidates, sourceRuns, consumedCandidates);
+        return new VerticalIntegerCandidateGroupingResult(
+            mergedCandidates,
+            sourceRuns,
+            consumedCandidates);
     }
 
-    private static List<IndexedCandidate> BuildAxisRun(
+    private static List<IndexedCandidate> FindBestRun(
         IndexedCandidate first,
-        IReadOnlyList<IndexedCandidate> digitCandidates,
+        IReadOnlyList<IndexedCandidate> allDigits,
         ISet<int> consumedIndexes)
     {
-        var axisCluster = digitCandidates
-            .Where(candidate => candidate.Candidate.PageNumber == first.Candidate.PageNumber
-                && !consumedIndexes.Contains(candidate.Index)
-                && IsAlignedOnVerticalAxis(first.Candidate, candidate.Candidate))
-            .OrderByDescending(candidate => candidate.Candidate.Top)
-            .ThenBy(candidate => candidate.Candidate.Left)
+        var samePage = allDigits
+            .Where(candidate =>
+                candidate.Candidate.PageNumber ==
+                first.Candidate.PageNumber)
+            .Where(candidate =>
+                !consumedIndexes.Contains(candidate.Index))
+            .Where(candidate =>
+                candidate.Index != first.Index)
             .ToList();
-        var firstIndex = axisCluster.FindIndex(candidate => candidate.Index == first.Index);
-        if (firstIndex < 0)
+
+        // ------------------------------------------------------------
+        // OPTION 1:
+        // Normal vertical PDF representation.
+        //
+        // Same X, changing Y:
+        //
+        //       4
+        //       0
+        //       0
+        // ------------------------------------------------------------
+
+        var normalVertical = BuildNormalVerticalRun(
+            first,
+            samePage);
+
+        // ------------------------------------------------------------
+        // OPTION 2:
+        // Rotated PDF representation.
+        //
+        // The text appears vertical visually but PdfPig coordinates
+        // represent the characters horizontally:
+        //
+        // 4 0 0
+        //
+        // Same Y, changing X.
+        // ------------------------------------------------------------
+
+        var rotatedVertical = BuildRotatedVerticalRun(
+            first,
+            samePage);
+
+        // Select whichever run gives us the strongest grouping.
+        if (rotatedVertical.Count > normalVertical.Count)
         {
-            return new List<IndexedCandidate> { first };
+            return rotatedVertical;
         }
 
-        var run = new List<IndexedCandidate> { first };
-        for (var i = firstIndex + 1; i < axisCluster.Count; i++)
+        return normalVertical;
+    }
+
+    private static List<IndexedCandidate> BuildNormalVerticalRun(
+        IndexedCandidate first,
+        IReadOnlyList<IndexedCandidate> candidates)
+    {
+        var result = new List<IndexedCandidate>
         {
-            var next = axisCluster[i];
-            if (!IsStackedBelow(run[^1].Candidate, next.Candidate) || !IsAlignedWithRunAxis(run, next.Candidate))
+            first
+        };
+
+        var current = first;
+
+        while (result.Count < MaximumDigitsInRun)
+        {
+            var nextCandidates = candidates
+                .Where(candidate =>
+                    !result.Any(
+                        existing =>
+                            existing.Index == candidate.Index))
+                .Where(candidate =>
+                    IsSameVerticalAxis(
+                        current.Candidate,
+                        candidate.Candidate))
+                .Select(candidate => new
+                {
+                    Candidate = candidate,
+                    Distance = Math.Abs(
+                        candidate.Candidate.CenterY -
+                        current.Candidate.CenterY)
+                })
+                .Where(x =>
+                    IsAcceptableGap(
+                        current.Candidate,
+                        x.Candidate.Candidate,
+                        x.Distance))
+                .OrderBy(x => x.Distance)
+                .ToList();
+
+            if (nextCandidates.Count == 0)
             {
                 break;
             }
 
-            run.Add(next);
+            var next = nextCandidates[0].Candidate;
+
+            result.Add(next);
+            current = next;
         }
 
-        return run;
+        // A valid normal vertical run must actually have
+        // meaningful Y separation.
+        if (result.Count >= 2)
+        {
+            var yRange =
+                result.Max(x => x.Candidate.CenterY) -
+                result.Min(x => x.Candidate.CenterY);
+
+            if (yRange > 0.5d)
+            {
+                // Order top-to-bottom according to PDF coordinates.
+                return result
+                    .OrderByDescending(
+                        x => x.Candidate.CenterY)
+                    .ToList();
+            }
+        }
+
+        return new List<IndexedCandidate>();
     }
 
-    private static DimensionCandidate Merge(IReadOnlyList<IndexedCandidate> run)
+    private static List<IndexedCandidate> BuildRotatedVerticalRun(
+        IndexedCandidate first,
+        IReadOnlyList<IndexedCandidate> candidates)
     {
-        var orderedRun = run
-            .OrderByDescending(candidate => candidate.Candidate.Top)
-            .ThenBy(candidate => candidate.Candidate.Left)
-            .ToList();
-        var text = string.Concat(orderedRun.Select(candidate => candidate.Candidate.Text.Trim()));
+        var result = new List<IndexedCandidate>
+        {
+            first
+        };
+
+        var current = first;
+
+        while (result.Count < MaximumDigitsInRun)
+        {
+            var nextCandidates = candidates
+                .Where(candidate =>
+                    !result.Any(
+                        existing =>
+                            existing.Index == candidate.Index))
+                .Where(candidate =>
+                    IsSameRotatedAxis(
+                        current.Candidate,
+                        candidate.Candidate))
+                .Select(candidate => new
+                {
+                    Candidate = candidate,
+                    Distance = Math.Abs(
+                        candidate.Candidate.CenterX -
+                        current.Candidate.CenterX)
+                })
+                .Where(x =>
+                    IsAcceptableGap(
+                        current.Candidate,
+                        x.Candidate.Candidate,
+                        x.Distance))
+                .OrderBy(x => x.Distance)
+                .ToList();
+
+            if (nextCandidates.Count == 0)
+            {
+                break;
+            }
+
+            var next = nextCandidates[0].Candidate;
+
+            result.Add(next);
+            current = next;
+        }
+
+        // A rotated vertical number must actually span X.
+        if (result.Count >= 2)
+        {
+            var xRange =
+                result.Max(x => x.Candidate.CenterX) -
+                result.Min(x => x.Candidate.CenterX);
+
+            if (xRange > 0.5d)
+            {
+                // The order along X corresponds to the character order
+                // of the rotated dimension.
+                return result
+                    .OrderBy(
+                        x => x.Candidate.CenterX)
+                    .ToList();
+            }
+        }
+
+        return new List<IndexedCandidate>();
+    }
+
+    private static bool IsSameVerticalAxis(
+        DimensionCandidate first,
+        DimensionCandidate second)
+    {
+        var xDifference =
+            Math.Abs(first.CenterX - second.CenterX);
+
+        var tolerance = Math.Max(
+            AxisTolerance,
+            Math.Max(
+                first.Width,
+                second.Width) * 2.0d);
+
+        return xDifference <= tolerance;
+    }
+
+    private static bool IsSameRotatedAxis(
+        DimensionCandidate first,
+        DimensionCandidate second)
+    {
+        var yDifference =
+            Math.Abs(first.CenterY - second.CenterY);
+
+        var tolerance = Math.Max(
+            AxisTolerance,
+            Math.Max(
+                first.Height,
+                second.Height) * 2.0d);
+
+        return yDifference <= tolerance;
+    }
+
+    private static bool IsAcceptableGap(
+        DimensionCandidate previous,
+        DimensionCandidate next,
+        double gap)
+    {
+        var referenceSize = Math.Max(
+            Math.Max(
+                previous.Width,
+                previous.Height),
+            Math.Max(
+                next.Width,
+                next.Height));
+
+        var maximumGap = Math.Min(
+            MaximumAbsoluteGap,
+            Math.Max(
+                MinimumGap,
+                referenceSize * MaximumGapRatio));
+
+        return gap >= 0d && gap <= maximumGap;
+    }
+
+    private static DimensionCandidate Merge(
+        IReadOnlyList<IndexedCandidate> run)
+    {
+        if (run.Count == 0)
+        {
+            throw new ArgumentException(
+                "Cannot merge an empty run.",
+                nameof(run));
+        }
+
+        // The run has already been ordered according to the
+        // appropriate coordinate axis.
+        var text = string.Concat(
+            run.Select(
+                x => x.Candidate.Text.Trim()));
+
         return new DimensionCandidate(
-            orderedRun[0].Candidate.PageNumber,
+            run[0].Candidate.PageNumber,
             DimensionDetector.NormalizeDimensionText(text),
-            orderedRun.Min(candidate => candidate.Candidate.Left),
-            orderedRun.Min(candidate => candidate.Candidate.Bottom),
-            orderedRun.Max(candidate => candidate.Candidate.Right),
-            orderedRun.Max(candidate => candidate.Candidate.Top),
+            run.Min(x => x.Candidate.Left),
+            run.Min(x => x.Candidate.Bottom),
+            run.Max(x => x.Candidate.Right),
+            run.Max(x => x.Candidate.Top),
             0);
     }
 
-    private static bool IsSingleDigit(DimensionCandidate candidate)
+    private static bool IsSingleDigit(
+        DimensionCandidate candidate)
     {
         var text = candidate.Text.Trim();
-        return text.Length == 1 && char.IsDigit(text[0]);
+
+        return text.Length == 1 &&
+               char.IsDigit(text[0]);
     }
 
-    private static bool IsStackedBelow(DimensionCandidate upper, DimensionCandidate lower)
+    private readonly record struct IndexedCandidate(
+        int Index,
+        DimensionCandidate Candidate)
     {
-        if (upper.PageNumber != lower.PageNumber || lower.CenterY >= upper.CenterY)
-        {
-            return false;
-        }
-
-        var maxHeight = Math.Max(upper.Height, lower.Height);
-        var verticalGap = upper.Bottom - lower.Top;
-        return verticalGap >= -maxHeight * MaximumVerticalOverlapRatio
-            && verticalGap <= Math.Max(MinimumVerticalGap, maxHeight * MaximumVerticalGapRatio);
+        public int Order => Index;
     }
-
-    private static bool IsAlignedWithRunAxis(IReadOnlyCollection<IndexedCandidate> run, DimensionCandidate candidate)
-    {
-        if (run.Count == 1)
-        {
-            return IsAlignedOnVerticalAxis(run.Single().Candidate, candidate);
-        }
-
-        var averageCenterX = run.Average(runCandidate => runCandidate.Candidate.CenterX);
-        var averageWidth = run.Average(runCandidate => runCandidate.Candidate.Width);
-        var averageHeight = run.Average(runCandidate => runCandidate.Candidate.Height);
-        var tolerance = Math.Max(
-            MaximumRunAxisCenterXDelta,
-            Math.Max(averageHeight * MaximumCenterXDeltaRatio, averageWidth * MaximumRunAxisCenterXDeltaRatio));
-        return Math.Abs(candidate.CenterX - averageCenterX) <= tolerance;
-    }
-
-    private static bool IsAlignedOnVerticalAxis(DimensionCandidate first, DimensionCandidate second)
-    {
-        if (first.PageNumber != second.PageNumber)
-        {
-            return false;
-        }
-
-        var minWidth = Math.Min(first.Width, second.Width);
-        if (minWidth <= 0d)
-        {
-            return false;
-        }
-
-        var horizontalOverlap = Math.Min(first.Right, second.Right) - Math.Max(first.Left, second.Left);
-        var centerXDelta = Math.Abs(first.CenterX - second.CenterX);
-        var maxHeight = Math.Max(first.Height, second.Height);
-        var pairedWidthTolerance = (first.Width + second.Width) * MaximumPairedWidthCenterXDeltaRatio;
-        var centerXDeltaTolerance = Math.Max(
-            Math.Max(MaximumCenterXDelta, maxHeight * MaximumCenterXDeltaRatio),
-            pairedWidthTolerance);
-        if (horizontalOverlap / minWidth >= MinimumHorizontalOverlapRatio || centerXDelta <= centerXDeltaTolerance)
-        {
-            return true;
-        }
-
-        if (!WouldMergeTallerThanWide(first, second))
-        {
-            return false;
-        }
-
-        var centerYDelta = Math.Abs(first.CenterY - second.CenterY);
-        var stackedCenterXDeltaTolerance = centerYDelta * MaximumStackedCenterXDeltaToCenterYDeltaRatio;
-        return centerXDelta <= stackedCenterXDeltaTolerance;
-    }
-
-    private static bool WouldMergeTallerThanWide(DimensionCandidate first, DimensionCandidate second)
-    {
-        var width = Math.Max(first.Right, second.Right) - Math.Min(first.Left, second.Left);
-        var height = Math.Max(first.Top, second.Top) - Math.Min(first.Bottom, second.Bottom);
-        return height > width;
-    }
-
-    private static bool IsTallerThanWide(DimensionCandidate candidate)
-    {
-        return candidate.Height > candidate.Width;
-    }
-
-    private readonly record struct IndexedCandidate(int Index, DimensionCandidate Candidate);
 }
+
 
 internal sealed class VerticalIntegerCandidateGroupingResult(
     IReadOnlyList<DimensionCandidate> mergedCandidates,
     IReadOnlyList<VerticalIntegerCandidateSourceRun> sourceRuns,
     IReadOnlyList<DimensionCandidate> consumedCandidates)
 {
-    public IReadOnlyList<DimensionCandidate> MergedCandidates { get; } = mergedCandidates;
+    public IReadOnlyList<DimensionCandidate> MergedCandidates
+    { get; } = mergedCandidates;
 
-    public IReadOnlyList<VerticalIntegerCandidateSourceRun> SourceRuns { get; } = sourceRuns;
+    public IReadOnlyList<VerticalIntegerCandidateSourceRun> SourceRuns
+    { get; } = sourceRuns;
 
-    public bool ContainsSource(DimensionCandidate candidate)
+    public bool ContainsSource(
+        DimensionCandidate candidate)
     {
-        return consumedCandidates.Any(consumed => IsSameSource(consumed, candidate));
+        return consumedCandidates.Any(
+            consumed => IsSameSource(
+                consumed,
+                candidate));
     }
 
-    private static bool IsSameSource(DimensionCandidate first, DimensionCandidate second)
+    private static bool IsSameSource(
+        DimensionCandidate first,
+        DimensionCandidate second)
     {
         return first.PageNumber == second.PageNumber
-            && string.Equals(first.Text, second.Text, StringComparison.Ordinal)
-            && Math.Abs(first.Left - second.Left) < 0.01d
-            && Math.Abs(first.Bottom - second.Bottom) < 0.01d
-            && Math.Abs(first.Right - second.Right) < 0.01d
-            && Math.Abs(first.Top - second.Top) < 0.01d;
+            && string.Equals(
+                first.Text,
+                second.Text,
+                StringComparison.Ordinal)
+            && Math.Abs(
+                first.Left - second.Left) < 0.01d
+            && Math.Abs(
+                first.Bottom - second.Bottom) < 0.01d
+            && Math.Abs(
+                first.Right - second.Right) < 0.01d
+            && Math.Abs(
+                first.Top - second.Top) < 0.01d;
     }
 }
+
 
 internal sealed record VerticalIntegerCandidateSourceRun(
     DimensionCandidate MergedCandidate,
