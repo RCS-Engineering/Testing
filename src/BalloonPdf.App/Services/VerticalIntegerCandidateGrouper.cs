@@ -23,6 +23,7 @@ internal static class VerticalIntegerCandidateGrouper
         ArgumentNullException.ThrowIfNull(isValidMergedCandidate);
 
         var mergedCandidates = new List<DimensionCandidate>();
+        var sourceRuns = new List<VerticalIntegerCandidateSourceRun>();
         var consumedCandidates = new List<DimensionCandidate>();
         var consumedIndexes = new HashSet<int>();
         var digitCandidates = wordCandidates
@@ -52,7 +53,13 @@ internal static class VerticalIntegerCandidateGrouper
                 continue;
             }
 
+            var sourceCandidates = run
+                .OrderByDescending(runCandidate => runCandidate.Candidate.Top)
+                .ThenBy(runCandidate => runCandidate.Candidate.Left)
+                .Select(runCandidate => runCandidate.Candidate)
+                .ToList();
             mergedCandidates.Add(merged);
+            sourceRuns.Add(new VerticalIntegerCandidateSourceRun(merged, sourceCandidates));
             foreach (var runCandidate in run)
             {
                 consumedIndexes.Add(runCandidate.Index);
@@ -60,7 +67,7 @@ internal static class VerticalIntegerCandidateGrouper
             }
         }
 
-        return new VerticalIntegerCandidateGroupingResult(mergedCandidates, consumedCandidates);
+        return new VerticalIntegerCandidateGroupingResult(mergedCandidates, sourceRuns, consumedCandidates);
     }
 
     private static List<IndexedCandidate> BuildAxisRun(
@@ -200,9 +207,12 @@ internal static class VerticalIntegerCandidateGrouper
 
 internal sealed class VerticalIntegerCandidateGroupingResult(
     IReadOnlyList<DimensionCandidate> mergedCandidates,
+    IReadOnlyList<VerticalIntegerCandidateSourceRun> sourceRuns,
     IReadOnlyList<DimensionCandidate> consumedCandidates)
 {
     public IReadOnlyList<DimensionCandidate> MergedCandidates { get; } = mergedCandidates;
+
+    public IReadOnlyList<VerticalIntegerCandidateSourceRun> SourceRuns { get; } = sourceRuns;
 
     public bool ContainsSource(DimensionCandidate candidate)
     {
@@ -219,3 +229,7 @@ internal sealed class VerticalIntegerCandidateGroupingResult(
             && Math.Abs(first.Top - second.Top) < 0.01d;
     }
 }
+
+internal sealed record VerticalIntegerCandidateSourceRun(
+    DimensionCandidate MergedCandidate,
+    IReadOnlyList<DimensionCandidate> SourceCandidates);
