@@ -8,7 +8,9 @@ public sealed class BalloonAnnotationService
     {
         ArgumentNullException.ThrowIfNull(dimensions);
 
-        return dimensions
+        var normalizedDimensions = GroupVerticalDigitCandidates(dimensions.ToList());
+
+        return normalizedDimensions
             .OrderBy(dimension => dimension.PageNumber)
             .ThenBy(dimension => dimension.BalloonNumber <= 0)
             .ThenBy(dimension => dimension.BalloonNumber > 0 ? dimension.BalloonNumber : int.MaxValue)
@@ -25,6 +27,40 @@ public sealed class BalloonAnnotationService
                 dimension.Right,
                 dimension.CenterY))
             .ToList();
+    }
+
+    private static IReadOnlyList<DimensionCandidate> GroupVerticalDigitCandidates(IReadOnlyList<DimensionCandidate> dimensions)
+    {
+        if (dimensions.Count(candidate => IsSingleDigit(candidate)) < 2)
+        {
+            return dimensions;
+        }
+
+        var grouping = VerticalIntegerCandidateGrouper.Build(dimensions, _ => true);
+        if (grouping.MergedCandidates.Count == 0)
+        {
+            return dimensions;
+        }
+
+        var normalizedDimensions = new List<DimensionCandidate>();
+        foreach (var sourceRun in grouping.SourceRuns)
+        {
+            var firstSourceBalloonNumber = sourceRun.SourceCandidates
+                .Select(candidate => candidate.BalloonNumber)
+                .FirstOrDefault(balloonNumber => balloonNumber > 0);
+            normalizedDimensions.Add(firstSourceBalloonNumber > 0
+                ? sourceRun.MergedCandidate with { BalloonNumber = firstSourceBalloonNumber }
+                : sourceRun.MergedCandidate);
+        }
+
+        normalizedDimensions.AddRange(dimensions.Where(dimension => !grouping.ContainsSource(dimension)));
+        return normalizedDimensions;
+    }
+
+    private static bool IsSingleDigit(DimensionCandidate candidate)
+    {
+        var text = candidate.Text.Trim();
+        return text.Length == 1 && char.IsDigit(text[0]);
     }
 
     public IReadOnlyList<BalloonAnnotation> Add(

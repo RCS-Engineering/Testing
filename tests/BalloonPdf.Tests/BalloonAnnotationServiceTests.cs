@@ -50,6 +50,62 @@ public sealed class BalloonAnnotationServiceTests
     }
 
     [Fact]
+    public void CreateFromDimensions_GroupsStackedDigitsAndPreservesSourceReadingOrder()
+    {
+        var dimensions = new[]
+        {
+            new DimensionCandidate(1, "1.000", 50, 20, 70, 40, 5),
+            new DimensionCandidate(1, "0", 10, 50, 18, 60, 4),
+            new DimensionCandidate(1, "Ø.250", 80, 120, 100, 140, 1),
+            new DimensionCandidate(1, "4", 10, 90, 18, 100, 2),
+            new DimensionCandidate(1, "0", 10, 70, 18, 80, 3)
+        };
+
+        var annotations = service.CreateFromDimensions(dimensions);
+
+        Assert.Collection(
+            annotations,
+            first => AssertAnnotation(first, pageNumber: 1, sourceText: "Ø.250", balloonNumber: 1, centerX: 120, centerY: 130, targetX: 100, targetY: 130),
+            second => AssertAnnotation(second, pageNumber: 1, sourceText: "400", balloonNumber: 2, centerX: 38, centerY: 75, targetX: 18, targetY: 75),
+            third => AssertAnnotation(third, pageNumber: 1, sourceText: "1.000", balloonNumber: 3, centerX: 90, centerY: 30, targetX: 70, targetY: 30));
+    }
+
+    [Fact]
+    public void CreateFromDimensions_GroupsStackedDigitsWithMoreThanThreeDigits()
+    {
+        var dimensions = new[]
+        {
+            new DimensionCandidate(1, "1", 10, 120, 18, 130, 0),
+            new DimensionCandidate(1, "2", 10, 100, 18, 110, 0),
+            new DimensionCandidate(1, "0", 10, 80, 18, 90, 0),
+            new DimensionCandidate(1, "0", 10, 60, 18, 70, 0)
+        };
+
+        var annotation = Assert.Single(service.CreateFromDimensions(dimensions));
+
+        AssertAnnotation(annotation, pageNumber: 1, sourceText: "1200", balloonNumber: 1, centerX: 38, centerY: 95, targetX: 18, targetY: 95);
+    }
+
+    [Fact]
+    public void CreateFromDimensions_DoesNotGroupMisalignedOrSeparatedSingleDigits()
+    {
+        var dimensions = new[]
+        {
+            new DimensionCandidate(1, "4", 10, 90, 18, 100, 0),
+            new DimensionCandidate(1, "0", 80, 70, 88, 80, 0),
+            new DimensionCandidate(1, "0", 10, 0, 18, 10, 0)
+        };
+
+        var annotations = service.CreateFromDimensions(dimensions);
+
+        Assert.Collection(
+            annotations,
+            first => AssertAnnotation(first, pageNumber: 1, sourceText: "4", balloonNumber: 1, centerX: 38, centerY: 95, targetX: 18, targetY: 95),
+            second => AssertAnnotation(second, pageNumber: 1, sourceText: "0", balloonNumber: 2, centerX: 108, centerY: 75, targetX: 88, targetY: 75),
+            third => AssertAnnotation(third, pageNumber: 1, sourceText: "0", balloonNumber: 3, centerX: 38, centerY: 5, targetX: 18, targetY: 5));
+    }
+
+    [Fact]
     public void Delete_RemovesSelectedAnnotationWithoutChangingOthers()
     {
         var annotations = SampleAnnotations();
