@@ -38,6 +38,7 @@ public sealed partial class BalloonEditorWindow : Window
         AnnotationListBox.ItemsSource = annotations;
         Preview.LoadDocument(previewInputPath, annotations);
         UpdatePageStatus();
+        UpdateZoomStatus();
 
         if (selectedId is not null)
         {
@@ -143,12 +144,26 @@ public sealed partial class BalloonEditorWindow : Window
     {
         Preview.PreviousPage();
         UpdatePageStatus();
+        UpdateZoomStatus();
     }
 
     private void NextPage_Click(object sender, RoutedEventArgs e)
     {
         Preview.NextPage();
         UpdatePageStatus();
+        UpdateZoomStatus();
+    }
+
+    private void ZoomIn_Click(object sender, RoutedEventArgs e)
+    {
+        Preview.ZoomIn();
+        UpdateZoomStatus();
+    }
+
+    private void ZoomOut_Click(object sender, RoutedEventArgs e)
+    {
+        Preview.ZoomOut();
+        UpdateZoomStatus();
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -187,5 +202,12 @@ public sealed partial class BalloonEditorWindow : Window
         PageTextBlock.Text = Preview.PageCount == 0
             ? "Page 0 of 0"
             : $"Page {Preview.CurrentPageNumber} of {Preview.PageCount}";
+    }
+
+    private void UpdateZoomStatus()
+    {
+        ZoomTextBlock.Text = $"Zoom {Preview.CurrentZoomPercent}%";
+        ZoomInButton.IsEnabled = Preview.CanZoomIn;
+        ZoomOutButton.IsEnabled = Preview.CanZoomOut;
     }
 }

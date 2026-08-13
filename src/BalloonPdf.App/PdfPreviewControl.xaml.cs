@@ -21,6 +21,7 @@ public sealed partial class PdfPreviewControl : UserControl
     private string? currentInputPath;
     private int currentPageNumber = 1;
     private double currentScale = 1d;
+    private double currentZoom = PdfZoomService.DefaultZoom;
 
     public PdfPreviewControl()
     {
@@ -35,6 +36,12 @@ public sealed partial class PdfPreviewControl : UserControl
 
     public int PageCount => pageSizes.Count;
 
+    public int CurrentZoomPercent => PdfZoomService.ToPercent(currentZoom);
+
+    public bool CanZoomIn => currentZoom < PdfZoomService.MaximumZoom;
+
+    public bool CanZoomOut => currentZoom > PdfZoomService.MinimumZoom;
+
     public void LoadPdf(string? pdfPath, IReadOnlyCollection<BalloonAnnotation>? pageAnnotations = null)
     {
         LoadDocument(pdfPath, pageAnnotations);
@@ -46,6 +53,7 @@ public sealed partial class PdfPreviewControl : UserControl
         pageSizes.Clear();
         currentInputPath = null;
         currentPageNumber = 1;
+        currentZoom = PdfZoomService.DefaultZoom;
 
         if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
         {
@@ -96,6 +104,16 @@ public sealed partial class PdfPreviewControl : UserControl
         return true;
     }
 
+    public bool ZoomIn()
+    {
+        return SetZoom(PdfZoomService.ZoomIn(currentZoom));
+    }
+
+    public bool ZoomOut()
+    {
+        return SetZoom(PdfZoomService.ZoomOut(currentZoom));
+    }
+
     public bool PreviousPage()
     {
         if (currentPageNumber <= 1)
@@ -104,6 +122,19 @@ public sealed partial class PdfPreviewControl : UserControl
         }
 
         currentPageNumber--;
+        RenderCurrentPage();
+        return true;
+    }
+
+    private bool SetZoom(double zoom)
+    {
+        var clampedZoom = PdfZoomService.Clamp(zoom);
+        if (Math.Abs(currentZoom - clampedZoom) < double.Epsilon)
+        {
+            return false;
+        }
+
+        currentZoom = clampedZoom;
         RenderCurrentPage();
         return true;
     }
@@ -119,7 +150,8 @@ public sealed partial class PdfPreviewControl : UserControl
 
         EmptyTextBlock.Visibility = Visibility.Collapsed;
         var pageSize = pageSizes[currentPageNumber - 1];
-        currentScale = Math.Min(1d, MaximumPageDisplayWidth / pageSize.Width);
+        var fitScale = Math.Min(1d, MaximumPageDisplayWidth / pageSize.Width);
+        currentScale = fitScale * currentZoom;
         var displayWidth = pageSize.Width * currentScale;
         var displayHeight = pageSize.Height * currentScale;
         PageCanvas.Width = displayWidth;
