@@ -1,14 +1,14 @@
 <UserControl x:Class="BalloonPdf.App.PdfPreviewControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Background="#FFF3F3F3">
+    <Grid Background="{StaticResource PreviewBackgroundBrush}">
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <Canvas x:Name="PageCanvas" Margin="16" Background="Transparent" MouseLeftButtonDown="PageCanvas_MouseLeftButtonDown" />
         </ScrollViewer>
         <TextBlock x:Name="EmptyTextBlock"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   Foreground="#FF666666"
+                   Foreground="{StaticResource MutedTextBrush}"
                    Text="Choose and generate a PDF to preview balloons." />
     </Grid>
 </UserControl>

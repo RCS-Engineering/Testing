@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:BalloonPdf.App"
-        Title="Edit Balloons" Height="720" Width="1100" MinHeight="560" MinWidth="900">
+        Title="Edit Balloons" Height="720" Width="1220" MinHeight="600" MinWidth="1040">
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -11,7 +11,7 @@
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="340" />
         </Grid.ColumnDefinitions>
 
         <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,0,12,8">
@@ -22,10 +22,10 @@
 
         <local:PdfPreviewControl x:Name="Preview" Grid.Row="1" Grid.Column="0" Margin="0,0,12,0" />
 
-        <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" BorderBrush="#FFCCCCCC" BorderThickness="1" Padding="12">
+        <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" Background="{StaticResource PanelBackgroundBrush}" Padding="14">
             <StackPanel>
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Balloons" />
-                <TextBlock Margin="0,4,0,8" Foreground="#FF666666" TextWrapping="Wrap" Text="Select a balloon on the page or in the list, edit its number/color, delete it, or add one by clicking the preview." />
+                <TextBlock FontSize="17" FontWeight="SemiBold" Text="Balloons" />
+                <TextBlock Margin="0,4,0,8" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Text="Select a balloon on the page or in the list, edit its number/color, delete it, or add one by clicking the preview." />
                 <ListBox x:Name="AnnotationListBox" Height="220" SelectionChanged="AnnotationListBox_SelectionChanged">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -42,11 +42,11 @@
                 </ListBox>
 
                 <TextBlock Margin="0,14,0,4" FontWeight="SemiBold" Text="Selected balloon" />
-                <TextBlock x:Name="SelectedTextBlock" Margin="0,0,0,8" Foreground="#FF666666" Text="No balloon selected." />
+                <TextBlock x:Name="SelectedTextBlock" Margin="0,0,0,8" Foreground="{StaticResource MutedTextBrush}" Text="No balloon selected." />
 
                 <TextBlock Text="Number" />
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
-                    <TextBox x:Name="NumberTextBox" Width="90" Margin="0,0,8,0" />
+                    <TextBox x:Name="NumberTextBox" Margin="0,0,8,0" />
                     <Button MinWidth="90" Content="Apply" Click="ApplyNumber_Click" />
                 </StackPanel>
 
@@ -61,7 +61,7 @@
 
                 <Button x:Name="AddButton" Margin="0,0,0,8" Content="Add balloon by clicking preview" Click="Add_Click" />
                 <Button Margin="0,0,0,8" Content="Delete selected" Click="Delete_Click" />
-                <TextBlock x:Name="EditorStatusTextBlock" Foreground="#FF666666" TextWrapping="Wrap" />
+                <TextBlock x:Name="EditorStatusTextBlock" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
             </StackPanel>
         </Border>
 
