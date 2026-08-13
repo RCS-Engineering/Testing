@@ -31,6 +31,7 @@
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="14,7" />
             <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource AccentPressedBrush}" />
@@ -44,9 +45,9 @@
                     <Setter Property="Background" Value="{StaticResource AccentPressedBrush}" />
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="{StaticResource DisabledTextBrush}" />
-                    <Setter Property="Background" Value="#FFD5E7F8" />
-                    <Setter Property="BorderBrush" Value="#FFB4CCE5" />
+                    <Setter Property="Foreground" Value="White" />
+                    <Setter Property="Background" Value="#FF6B7F95" />
+                    <Setter Property="BorderBrush" Value="#FF4F647A" />
                     <Setter Property="Cursor" Value="Arrow" />
                 </Trigger>
             </Style.Triggers>
