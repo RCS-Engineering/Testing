@@ -231,6 +231,59 @@ public sealed class ImageDimensionDetectorTests : IDisposable
             });
     }
 
+    [Theory]
+    [InlineData("60", "6", "0", 298, 100, 310, 122, 320, 160, 336, 182, "48", 420, 230, 450, 252)]
+    [InlineData("300", "3", "0", 298, 100, 310, 122, 320, 160, 336, 182, "48", 420, 285, 450, 307)]
+    public void Detect_MergesOffsetStackedOcrIntegersWithoutKeepingSourceDigits(
+        string expectedVerticalText,
+        string topDigit,
+        string lowerDigit,
+        int topDigitLeft,
+        int topDigitTop,
+        int topDigitRight,
+        int topDigitBottom,
+        int lowerDigitLeft,
+        int lowerDigitTop,
+        int lowerDigitRight,
+        int lowerDigitBottom,
+        string followingText,
+        int followingLeft,
+        int followingTop,
+        int followingRight,
+        int followingBottom)
+    {
+        var imagePath = CreateJpeg("drawing.jpg", width: 1000, height: 800);
+        var words = new List<ImageTextWord>
+        {
+            new(topDigit, topDigitLeft, topDigitTop, topDigitRight, topDigitBottom),
+            new(lowerDigit, lowerDigitLeft, lowerDigitTop, lowerDigitRight, lowerDigitBottom),
+            new(followingText, followingLeft, followingTop, followingRight, followingBottom)
+        };
+        if (expectedVerticalText.Length == 3)
+        {
+            words.Add(new ImageTextWord("0", lowerDigitLeft - 2, lowerDigitTop + 60, lowerDigitRight - 2, lowerDigitBottom + 60));
+        }
+
+        var detector = new ImageDimensionDetector(new FakeImageTextExtractor(words));
+
+        var dimensions = detector.Detect(imagePath);
+
+        Assert.Collection(dimensions,
+            first =>
+            {
+                Assert.Equal(expectedVerticalText, first.Text);
+                Assert.Equal(1, first.BalloonNumber);
+                Assert.True(first.Height > first.Width);
+            },
+            second =>
+            {
+                Assert.Equal(followingText, second.Text);
+                Assert.Equal(2, second.BalloonNumber);
+            });
+        Assert.Single(dimensions, dimension => dimension.Text == expectedVerticalText);
+        Assert.DoesNotContain(dimensions, dimension => dimension.Text == topDigit || dimension.Text == lowerDigit);
+    }
+
     [Fact]
     public void Detect_MergesOffsetVertical400OcrDigitsWithoutShiftingBalloonNumbers()
     {
