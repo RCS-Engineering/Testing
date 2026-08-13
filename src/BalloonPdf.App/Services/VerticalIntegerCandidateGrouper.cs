@@ -8,6 +8,7 @@ internal static class VerticalIntegerCandidateGrouper
     private const double MaximumCenterXDeltaRatio = 0.75d;
     private const double MaximumCenterXDelta = 10d;
     private const double MaximumPairedWidthCenterXDeltaRatio = 1d;
+    private const double MaximumStackedCenterXDeltaToCenterYDeltaRatio = 0.45d;
     private const double MaximumRunAxisCenterXDeltaRatio = 1.25d;
     private const double MaximumRunAxisCenterXDelta = 12d;
     private const double MaximumVerticalGapRatio = 4.75d;
@@ -46,7 +47,7 @@ internal static class VerticalIntegerCandidateGrouper
             }
 
             var merged = Merge(run);
-            if (!isValidMergedCandidate(merged))
+            if (!IsTallerThanWide(merged) || !isValidMergedCandidate(merged))
             {
                 continue;
             }
@@ -133,6 +134,11 @@ internal static class VerticalIntegerCandidateGrouper
 
     private static bool IsAlignedWithRunAxis(IReadOnlyCollection<IndexedCandidate> run, DimensionCandidate candidate)
     {
+        if (run.Count == 1)
+        {
+            return IsAlignedOnVerticalAxis(run.Single().Candidate, candidate);
+        }
+
         var averageCenterX = run.Average(runCandidate => runCandidate.Candidate.CenterX);
         var averageWidth = run.Average(runCandidate => runCandidate.Candidate.Width);
         var averageHeight = run.Average(runCandidate => runCandidate.Candidate.Height);
@@ -162,8 +168,31 @@ internal static class VerticalIntegerCandidateGrouper
         var centerXDeltaTolerance = Math.Max(
             Math.Max(MaximumCenterXDelta, maxHeight * MaximumCenterXDeltaRatio),
             pairedWidthTolerance);
-        return horizontalOverlap / minWidth >= MinimumHorizontalOverlapRatio
-            || centerXDelta <= centerXDeltaTolerance;
+        if (horizontalOverlap / minWidth >= MinimumHorizontalOverlapRatio || centerXDelta <= centerXDeltaTolerance)
+        {
+            return true;
+        }
+
+        if (!WouldMergeTallerThanWide(first, second))
+        {
+            return false;
+        }
+
+        var centerYDelta = Math.Abs(first.CenterY - second.CenterY);
+        var stackedCenterXDeltaTolerance = centerYDelta * MaximumStackedCenterXDeltaToCenterYDeltaRatio;
+        return centerXDelta <= stackedCenterXDeltaTolerance;
+    }
+
+    private static bool WouldMergeTallerThanWide(DimensionCandidate first, DimensionCandidate second)
+    {
+        var width = Math.Max(first.Right, second.Right) - Math.Min(first.Left, second.Left);
+        var height = Math.Max(first.Top, second.Top) - Math.Min(first.Bottom, second.Bottom);
+        return height > width;
+    }
+
+    private static bool IsTallerThanWide(DimensionCandidate candidate)
+    {
+        return candidate.Height > candidate.Width;
     }
 
     private readonly record struct IndexedCandidate(int Index, DimensionCandidate Candidate);
