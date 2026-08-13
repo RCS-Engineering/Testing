@@ -45,38 +45,9 @@
                        Text="Page 0 of 0" />
 
             <Button MinWidth="90"
-                    Margin="0,0,8,0"
                     Click="NextPage_Click">
 
                 <TextBlock Text="Next"
-                           Foreground="White"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Center"/>
-
-            </Button>
-
-            <Button x:Name="ZoomOutButton"
-                    MinWidth="90"
-                    Margin="0,0,8,0"
-                    Click="ZoomOut_Click">
-
-                <TextBlock Text="Zoom Out"
-                           Foreground="White"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Center"/>
-
-            </Button>
-
-            <TextBlock x:Name="ZoomTextBlock"
-                       VerticalAlignment="Center"
-                       Margin="0,0,8,0"
-                       Text="Zoom 100%" />
-
-            <Button x:Name="ZoomInButton"
-                    MinWidth="90"
-                    Click="ZoomIn_Click">
-
-                <TextBlock Text="Zoom In"
                            Foreground="White"
                            FontWeight="SemiBold"
                            HorizontalAlignment="Center"/>
