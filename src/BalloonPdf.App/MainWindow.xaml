@@ -3,51 +3,97 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:BalloonPdf.App"
         Title="Balloon PDF" Height="720" Width="1040" MinHeight="600" MinWidth="880">
-    <Grid Margin="16">
+    <Grid Background="{StaticResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,10" VerticalAlignment="Center" Text="Input PDF" />
-        <TextBox x:Name="InputPathTextBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,10" IsReadOnly="True" />
-        <Button Grid.Row="0" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Browse..." Click="SelectInput_Click" />
-
-        <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,10" VerticalAlignment="Center" Text="Output PDF" />
-        <TextBox x:Name="OutputPathTextBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,10" />
-        <Button Grid.Row="1" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Save As..." Click="SelectOutput_Click" />
-
-        <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,10" VerticalAlignment="Center" Text="Excel Template" />
-        <TextBox x:Name="ExcelTemplatePathTextBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,10" />
-        <Button Grid.Row="2" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Browse..." Click="SelectExcelTemplate_Click" />
-
-        <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,10" VerticalAlignment="Center" Text="Output Excel" />
-        <TextBox x:Name="ExcelOutputPathTextBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,10" />
-        <Button Grid.Row="3" Grid.Column="2" Margin="0,0,0,10" MinWidth="96" Content="Save As..." Click="SelectExcelOutput_Click" />
-
-        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal">
-            <Button x:Name="GenerateButton" MinWidth="120" Margin="0,0,8,0" Padding="12,6" Content="Generate" Click="Generate_Click" />
-            <Button x:Name="ExpandEditButton" MinWidth="120" Margin="0,0,8,0" Padding="12,6" Content="Expand/Edit" IsEnabled="False" Click="ExpandEdit_Click" />
-            <Button x:Name="OpenPdfButton" MinWidth="120" Margin="0,0,8,0" Padding="12,6" Content="Open PDF" IsEnabled="False" Click="OpenPdf_Click" />
-            <Button x:Name="OpenExcelButton" MinWidth="120" Padding="12,6" Content="Open Excel" IsEnabled="False" Click="OpenExcel_Click" />
-        </StackPanel>
-
-        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,16,0,0" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" Background="{StaticResource PanelBackgroundBrush}">
-            <local:PdfPreviewControl x:Name="InlinePreview" />
+        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" Padding="28,20">
+            <StackPanel>
+                <TextBlock FontSize="28" FontWeight="Bold" Foreground="White" Text="Engineering Balloon Generator" />
+                <TextBlock Margin="0,4,0,0" FontSize="15" Foreground="#DDEEFF" Text="Create ballooned engineering PDFs and matching Excel dimension workbooks." />
+            </StackPanel>
         </Border>
 
-        <Border Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Padding="10" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" Background="{StaticResource PanelBackgroundBrush}">
-            <TextBlock x:Name="StatusTextBlock" TextWrapping="Wrap" Text="Choose a vector-text engineering PDF to begin." />
-        </Border>
+        <Grid Grid.Row="1" Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0">
+                <Border Margin="0,0,0,12" Padding="18,14" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Input PDF" />
+                        <TextBox x:Name="InputPathTextBox" Grid.Column="1" Margin="0,0,12,0" IsReadOnly="True" />
+                        <Button Grid.Column="2" MinWidth="104" Content="Browse..." Click="SelectInput_Click" />
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,0,0,12" Padding="18,14" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Output PDF" />
+                        <TextBox x:Name="OutputPathTextBox" Grid.Column="1" Margin="0,0,12,0" />
+                        <Button Grid.Column="2" MinWidth="104" Content="Save As..." Click="SelectOutput_Click" />
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,0,0,12" Padding="18,14" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Excel Template" />
+                        <TextBox x:Name="ExcelTemplatePathTextBox" Grid.Column="1" Margin="0,0,12,0" />
+                        <Button Grid.Column="2" MinWidth="104" Content="Browse..." Click="SelectExcelTemplate_Click" />
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,0,0,14" Padding="18,14" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Output Excel" />
+                        <TextBox x:Name="ExcelOutputPathTextBox" Grid.Column="1" Margin="0,0,12,0" />
+                        <Button Grid.Column="2" MinWidth="104" Content="Save As..." Click="SelectExcelOutput_Click" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <Border Grid.Row="1" Padding="16" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="GenerateButton" MinWidth="128" Margin="0,0,10,0" Content="Generate" Click="Generate_Click" />
+                    <Button x:Name="ExpandEditButton" MinWidth="128" Margin="0,0,10,0" Content="Expand/Edit" IsEnabled="False" Click="ExpandEdit_Click" />
+                    <Button x:Name="OpenPdfButton" MinWidth="128" Margin="0,0,10,0" Content="Open PDF" IsEnabled="False" Click="OpenPdf_Click" />
+                    <Button x:Name="OpenExcelButton" MinWidth="128" Content="Open Excel" IsEnabled="False" Click="OpenExcel_Click" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Margin="0,16,0,0" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" Background="{StaticResource PanelBackgroundBrush}" CornerRadius="10">
+                <local:PdfPreviewControl x:Name="InlinePreview" />
+            </Border>
+
+            <Border Grid.Row="3" Margin="0,12,0,0" Padding="14" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" Background="{StaticResource PanelBackgroundBrush}" CornerRadius="10">
+                <TextBlock x:Name="StatusTextBlock" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Text="Choose a vector-text engineering PDF to begin." />
+            </Border>
+        </Grid>
     </Grid>
 </Window>

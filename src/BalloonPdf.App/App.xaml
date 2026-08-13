@@ -3,17 +3,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#FFEAF4FF" />
-        <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#FFF7FBFF" />
-        <SolidColorBrush x:Key="PreviewBackgroundBrush" Color="#FFDDEEFF" />
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#FFE8F2FB" />
+        <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#FFFFFFFF" />
+        <SolidColorBrush x:Key="PreviewBackgroundBrush" Color="#FFDCEBF7" />
         <SolidColorBrush x:Key="InputBackgroundBrush" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="InputBorderBrush" Color="#FF7AA7D9" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#FF1E6BB8" />
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF2D84D8" />
-        <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF15518F" />
+        <SolidColorBrush x:Key="InputBorderBrush" Color="#FFB8CFE5" />
+        <SolidColorBrush x:Key="HeaderBrush" Color="#FF0B66B2" />
+        <SolidColorBrush x:Key="HeaderAccentBrush" Color="#FF1D86D9" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF0B66B2" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF1D86D9" />
+        <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF064E8C" />
         <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FF102A43" />
-        <SolidColorBrush x:Key="MutedTextBrush" Color="#FF4F6F8F" />
-        <SolidColorBrush x:Key="DisabledTextBrush" Color="#FF8EA4BB" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#FF5F7892" />
+        <SolidColorBrush x:Key="DisabledTextBrush" Color="#FF9CAFBE" />
+        <SolidColorBrush x:Key="DisabledButtonBrush" Color="#FF7E95AA" />
+        <SolidColorBrush x:Key="DisabledButtonBorderBrush" Color="#FF647B90" />
 
         <Style TargetType="Window">
             <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
@@ -28,8 +32,8 @@
         </Style>
 
         <Style TargetType="Button">
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Padding" Value="18,9" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Foreground" Value="White" />
@@ -37,6 +41,21 @@
             <Setter Property="BorderBrush" Value="{StaticResource AccentPressedBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{StaticResource AccentHoverBrush}" />
@@ -46,17 +65,17 @@
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Foreground" Value="White" />
-                    <Setter Property="Background" Value="#FF6B7F95" />
-                    <Setter Property="BorderBrush" Value="#FF4F647A" />
+                    <Setter Property="Background" Value="{StaticResource DisabledButtonBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource DisabledButtonBorderBrush}" />
                     <Setter Property="Cursor" Value="Arrow" />
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="MinWidth" Value="180" />
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Padding" Value="12,8" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
             <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
@@ -68,15 +87,15 @@
                     <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsReadOnly" Value="True">
-                    <Setter Property="Background" Value="#FFEFF6FD" />
+                    <Setter Property="Background" Value="#FFF4F8FC" />
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style TargetType="ComboBox">
-            <Setter Property="MinWidth" Value="180" />
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Padding" Value="12,8" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
             <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
