@@ -17,6 +17,7 @@ public partial class MainWindow : Window
 
     private string? currentInputPath;
     private string? currentOutputPath;
+    private string? currentExcelOutputPath;
     private IReadOnlyList<DimensionCandidate> currentDimensions = Array.Empty<DimensionCandidate>();
     private IReadOnlyList<BalloonAnnotation> currentAnnotations = Array.Empty<BalloonAnnotation>();
 
@@ -43,13 +44,7 @@ public partial class MainWindow : Window
         InputPathTextBox.Text = dialog.FileName;
         OutputPathTextBox.Text = outputPathService.GetDefaultOutputPath(dialog.FileName);
         ExcelOutputPathTextBox.Text = outputPathService.GetDefaultExcelOutputPath(dialog.FileName);
-        currentInputPath = null;
-        currentOutputPath = null;
-        currentDimensions = Array.Empty<DimensionCandidate>();
-        currentAnnotations = Array.Empty<BalloonAnnotation>();
-        ExpandEditButton.IsEnabled = false;
-        OpenPdfButton.IsEnabled = false;
-        InlinePreview.LoadDocument(null);
+        ResetGeneratedState();
         SetStatus("Source drawing selected. Choose Generate to create a ballooned PDF and Excel workbook.");
     }
 
@@ -121,6 +116,8 @@ public partial class MainWindow : Window
         var excelTemplatePath = ExcelTemplatePathTextBox.Text.Trim();
         var excelOutputPath = ExcelOutputPathTextBox.Text.Trim();
 
+        ResetGeneratedState();
+
         if (!ValidatePaths(inputPath, outputPath, excelTemplatePath, excelOutputPath))
         {
             return;
@@ -140,19 +137,21 @@ public partial class MainWindow : Window
             }
 
             currentInputPath = inputPath;
-            currentOutputPath = outputPath;
             currentDimensions = dimensions;
             currentAnnotations = annotationService.CreateFromDimensions(dimensions);
 
             SetStatus($"Detected {dimensions.Count} dimensions. Writing ballooned PDF...");
             await Task.Run(() => balloonAnnotator.AddBalloons(inputPath, outputPath, currentAnnotations));
+            currentOutputPath = outputPath;
+            OpenPdfButton.IsEnabled = File.Exists(currentOutputPath);
 
             SetStatus("Writing Excel dimension workbook...");
             await Task.Run(() => excelExporter.Export(excelTemplatePath, excelOutputPath, dimensions));
+            currentExcelOutputPath = excelOutputPath;
+            OpenExcelButton.IsEnabled = File.Exists(currentExcelOutputPath);
 
             InlinePreview.LoadDocument(inputPath, currentAnnotations);
             ExpandEditButton.IsEnabled = true;
-            OpenPdfButton.IsEnabled = true;
             SetStatus($"Created ballooned PDF: {outputPath}\nCreated Excel workbook: {excelOutputPath}");
         }
         catch (Exception ex)
@@ -216,6 +215,21 @@ public partial class MainWindow : Window
         }
 
         Process.Start(new ProcessStartInfo(outputPath)
+        {
+            UseShellExecute = true
+        });
+    }
+
+    private void OpenExcel_Click(object sender, RoutedEventArgs e)
+    {
+        var excelOutputPath = currentExcelOutputPath ?? ExcelOutputPathTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(excelOutputPath) || !File.Exists(excelOutputPath))
+        {
+            SetStatus("Generate an Excel workbook before opening it.");
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo(excelOutputPath)
         {
             UseShellExecute = true
         });
@@ -305,6 +319,19 @@ public partial class MainWindow : Window
         }
 
         return null;
+    }
+
+    private void ResetGeneratedState()
+    {
+        currentInputPath = null;
+        currentOutputPath = null;
+        currentExcelOutputPath = null;
+        currentDimensions = Array.Empty<DimensionCandidate>();
+        currentAnnotations = Array.Empty<BalloonAnnotation>();
+        ExpandEditButton.IsEnabled = false;
+        OpenPdfButton.IsEnabled = false;
+        OpenExcelButton.IsEnabled = false;
+        InlinePreview.LoadDocument(null);
     }
 
     private void SetStatus(string message)
