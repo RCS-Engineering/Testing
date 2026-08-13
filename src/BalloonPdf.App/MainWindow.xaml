@@ -11,8 +11,8 @@
 
         <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" Padding="28,20">
             <StackPanel>
-                <TextBlock FontSize="28" FontWeight="Bold" Foreground="White" Text="Engineering Balloon Generator" />
-                <TextBlock Margin="0,4,0,0" FontSize="15" Foreground="#DDEEFF" Text="Create ballooned engineering PDFs and matching Excel dimension workbooks." />
+                <TextBlock FontSize="28" FontWeight="Bold" Foreground="White" Text="Engineering Drawing Balloon Generator" />
+                <TextBlock Margin="0,4,0,0" FontSize="15" Foreground="#DDEEFF" Text="Automatically Generates Balloon numbers on Drawings as PDF and Inspection Report as Excel having Dimesions" />
             </StackPanel>
         </Border>
 
@@ -25,7 +25,7 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0">
-                <Border Margin="0,0,0,12" Padding="18,14" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
+                <Border Margin="0,0,0,12" Padding="18,14"  Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="150" />
@@ -34,7 +34,14 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Input PDF" />
                         <TextBox x:Name="InputPathTextBox" Grid.Column="1" Margin="0,0,12,0" IsReadOnly="True" />
-                        <Button Grid.Column="2" MinWidth="104" Content="Browse..." Click="SelectInput_Click" />
+                        <Button Grid.Column="2"
+        MinWidth="250"
+        Click="SelectInput_Click">
+                            <TextBlock Text="Browse......."
+               Foreground="White"
+               FontWeight="SemiBold"
+               HorizontalAlignment="Center"/>
+                        </Button>
                     </Grid>
                 </Border>
 
@@ -47,7 +54,14 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Output PDF" />
                         <TextBox x:Name="OutputPathTextBox" Grid.Column="1" Margin="0,0,12,0" />
-                        <Button Grid.Column="2" MinWidth="104" Content="Save As..." Click="SelectOutput_Click" />
+                        <Button Grid.Column="2"
+        MinWidth="250"
+        Click="SelectOutput_Click">
+                            <TextBlock Text="Save As......."
+               Foreground="White"
+               FontWeight="SemiBold"
+               HorizontalAlignment="Center"/>
+                        </Button>
                     </Grid>
                 </Border>
 
@@ -60,7 +74,14 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Excel Template" />
                         <TextBox x:Name="ExcelTemplatePathTextBox" Grid.Column="1" Margin="0,0,12,0" />
-                        <Button Grid.Column="2" MinWidth="104" Content="Browse..." Click="SelectExcelTemplate_Click" />
+                        <Button Grid.Column="2"
+        MinWidth="250"
+        Click="SelectExcelTemplate_Click">
+                            <TextBlock Text="Browse......."
+               Foreground="White"
+               FontWeight="SemiBold"
+               HorizontalAlignment="Center"/>
+                        </Button>
                     </Grid>
                 </Border>
 
@@ -73,17 +94,72 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Output Excel" />
                         <TextBox x:Name="ExcelOutputPathTextBox" Grid.Column="1" Margin="0,0,12,0" />
-                        <Button Grid.Column="2" MinWidth="104" Content="Save As..." Click="SelectExcelOutput_Click" />
+                        <Button Grid.Column="2"
+        MinWidth="250"
+        Click="SelectExcelOutput_Click">
+                            <TextBlock Text="Save As......."
+               Foreground="White"
+               FontWeight="SemiBold"
+               HorizontalAlignment="Center"/>
+                        </Button>
                     </Grid>
                 </Border>
             </StackPanel>
 
             <Border Grid.Row="1" Padding="16" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1" CornerRadius="10">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <Button x:Name="GenerateButton" MinWidth="128" Margin="0,0,10,0" Content="Generate" Click="Generate_Click" />
-                    <Button x:Name="ExpandEditButton" MinWidth="128" Margin="0,0,10,0" Content="Expand/Edit" IsEnabled="False" Click="ExpandEdit_Click" />
-                    <Button x:Name="OpenPdfButton" MinWidth="128" Margin="0,0,10,0" Content="Open PDF" IsEnabled="False" Click="OpenPdf_Click" />
-                    <Button x:Name="OpenExcelButton" MinWidth="128" Content="Open Excel" IsEnabled="False" Click="OpenExcel_Click" />
+                <StackPanel Orientation="Horizontal"
+            HorizontalAlignment="Center">
+
+                    <Button x:Name="GenerateButton"
+            MinWidth="128"
+            Margin="0,0,10,0"
+            Click="Generate_Click">
+
+                        <TextBlock Text="Generate"
+                   Foreground="White"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"/>
+
+                    </Button>
+
+                    <Button x:Name="ExpandEditButton"
+            MinWidth="128"
+            Margin="0,0,10,0"
+            IsEnabled="False"
+            Click="ExpandEdit_Click">
+
+                        <TextBlock Text="Expand/Edit"
+                   Foreground="White"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"/>
+
+                    </Button>
+
+                    <Button x:Name="OpenPdfButton"
+            MinWidth="128"
+            Margin="0,0,10,0"
+            IsEnabled="False"
+            Click="OpenPdf_Click">
+
+                        <TextBlock Text="Open PDF"
+                   Foreground="White"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"/>
+
+                    </Button>
+
+                    <Button x:Name="OpenExcelButton"
+            MinWidth="128"
+            IsEnabled="False"
+            Click="OpenExcel_Click">
+
+                        <TextBlock Text="Open Excel"
+                   Foreground="White"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"/>
+
+                    </Button>
+
                 </StackPanel>
             </Border>
 
