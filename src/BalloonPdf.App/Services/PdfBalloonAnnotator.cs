@@ -62,6 +62,11 @@ public sealed class PdfBalloonAnnotator
 
     private static void AddPdfPages(string inputFullPath, PdfDocument output, IReadOnlyCollection<BalloonAnnotation> annotations)
     {
+        var tableRegionsByPage = new PdfTableRegionDetector()
+            .Detect(inputFullPath)
+            .GroupBy(region => region.PageNumber)
+            .ToDictionary(group => group.Key, group => (IReadOnlyCollection<PdfTableRegion>)group.ToList());
+
         using var input = PdfReader.Open(inputFullPath, PdfDocumentOpenMode.Import);
         output.Info.Title = input.Info.Title;
         output.Info.Author = input.Info.Author;
@@ -70,8 +75,13 @@ public sealed class PdfBalloonAnnotator
 
         for (var pageIndex = 0; pageIndex < input.PageCount; pageIndex++)
         {
+            var pageNumber = pageIndex + 1;
             var page = output.AddPage(input.Pages[pageIndex]);
-            DrawPageBalloons(page, annotations.Where(annotation => annotation.PageNumber == pageIndex + 1));
+            tableRegionsByPage.TryGetValue(pageNumber, out var pageTableRegions);
+            DrawPageBalloons(
+                page,
+                annotations.Where(annotation => annotation.PageNumber == pageNumber),
+                pageTableRegions ?? Array.Empty<PdfTableRegion>());
         }
     }
 
@@ -88,10 +98,13 @@ public sealed class PdfBalloonAnnotator
             graphics.DrawImage(image, 0d, 0d, imageInfo.Width, imageInfo.Height);
         }
 
-        DrawPageBalloons(page, annotations.Where(annotation => annotation.PageNumber == 1));
+        DrawPageBalloons(page, annotations.Where(annotation => annotation.PageNumber == 1), Array.Empty<PdfTableRegion>());
     }
 
-    private static void DrawPageBalloons(PdfPage page, IEnumerable<BalloonAnnotation> annotations)
+    private static void DrawPageBalloons(
+        PdfPage page,
+        IEnumerable<BalloonAnnotation> annotations,
+        IReadOnlyCollection<PdfTableRegion> tableRegions)
     {
         var pageAnnotations = annotations.ToList();
         if (pageAnnotations.Count == 0)
@@ -106,6 +119,12 @@ public sealed class PdfBalloonAnnotator
 
         foreach (var annotation in pageAnnotations)
         {
+            var classificationPoint = GetAnnotationClassificationPoint(annotation);
+            if (tableRegions.Any(region => region.Contains(classificationPoint.X, classificationPoint.Y)))
+            {
+                continue;
+            }
+
             var center = ConvertToPdfSharpPoint(annotation, pageWidth, pageHeight);
             var radius = annotation.Radius <= 0d ? BalloonRadius : annotation.Radius;
             var bounds = new XRect(
@@ -120,6 +139,13 @@ public sealed class PdfBalloonAnnotator
             graphics.DrawEllipse(pen, brush, bounds);
             DrawBalloonNumber(graphics, pen, bounds, annotation.BalloonNumber);
         }
+    }
+
+    private static XPoint GetAnnotationClassificationPoint(BalloonAnnotation annotation)
+    {
+        return annotation.TargetX is { } targetX && annotation.TargetY is { } targetY
+            ? new XPoint(targetX, targetY)
+            : new XPoint(annotation.CenterX, annotation.CenterY);
     }
 
     internal static XPoint ConvertToPdfSharpPoint(DimensionCandidate dimension, double pageWidth, double pageHeight)

@@ -136,6 +136,33 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         Assert.True(arrowPixels >= 12, $"Expected blue pixels along the association arrow path, but found only {arrowPixels}.");
     }
 
+    [Fact]
+    public void AddBalloons_SkipsTargetAnchoredInsideVectorTableButKeepsOutsideBalloon()
+    {
+        var inputPath = CreatePdfWithVectorTable("input-with-table.pdf");
+        var outputPath = Path.Combine(tempDirectory, "output-with-table-suppression.pdf");
+        var annotations = new[]
+        {
+            BalloonAnnotation.Create(
+                1,
+                centerX: 160,
+                centerY: 70,
+                balloonNumber: 1,
+                targetX: 60,
+                targetY: 70),
+            BalloonAnnotation.Create(1, centerX: 160, centerY: 150, balloonNumber: 2)
+        };
+
+        annotator.AddBalloons(inputPath, outputPath, annotations);
+
+        var preview = new PdfPagePreviewRenderer().RenderPage(outputPath, pageNumber: 1, pixelWidth: 400, pixelHeight: 400);
+        var skippedBalloonPixels = CountBluePixels(preview, left: 292, top: 242, width: 56, height: 36);
+        var outsideBalloonPixels = CountBluePixels(preview, left: 292, top: 82, width: 56, height: 36);
+
+        Assert.True(skippedBalloonPixels <= 2, $"Expected no meaningful blue pixels for the skipped table balloon, but found {skippedBalloonPixels}.");
+        Assert.True(outsideBalloonPixels >= 25, $"Expected a visible outside blue balloon, but found only {outsideBalloonPixels} blue pixels.");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(tempDirectory))
@@ -208,6 +235,30 @@ public sealed class PdfBalloonAnnotatorTests : IDisposable
         var font = new XFont("Arial", 12, XFontStyleEx.Regular);
         graphics.DrawString(text, font, XBrushes.Black, new XPoint(24, 80));
         graphics.DrawRectangle(XPens.Black, 24, 100, 60, 30);
+        document.Save(path);
+        return path;
+    }
+
+    private string CreatePdfWithVectorTable(string fileName)
+    {
+        var path = Path.Combine(tempDirectory, fileName);
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Width = XUnit.FromPoint(200);
+        page.Height = XUnit.FromPoint(200);
+        using var graphics = XGraphics.FromPdfPage(page);
+        var pen = new XPen(XColors.Black, 1d);
+
+        foreach (var x in new[] { 30d, 80d, 130d })
+        {
+            graphics.DrawLine(pen, x, 100d, x, 160d);
+        }
+
+        foreach (var y in new[] { 100d, 130d, 160d })
+        {
+            graphics.DrawLine(pen, 30d, y, 130d, y);
+        }
+
         document.Save(path);
         return path;
     }
