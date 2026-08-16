@@ -130,6 +130,12 @@ public sealed class ArialFontResolver : IFontResolver
             yield return fontsDirectory;
         }
 
+        var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(homeDirectory))
+        {
+            yield return Path.Combine(homeDirectory, ".local", "share", "fonts");
+        }
+
         yield return "/usr/share/fonts/truetype/msttcorefonts";
         yield return "/usr/share/fonts/truetype/liberation2";
         yield return "/usr/share/fonts/truetype/dejavu";
